@@ -28,7 +28,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
-// ---------- Questions ----------
+// ---------- Types ----------
 
 export interface Question {
   id: string;
@@ -39,10 +39,27 @@ export interface Question {
   views: number;
   helpful: number;
   notHelpful: number;
+  voteScore: number;
   categoryId: string | null;
   category?: Category;
+  contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;
+  _count?: { answers: number; votes: number };
+  answers?: Answer[];
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Answer {
+  id: string;
+  answerText: string;
+  status: string;
+  voteScore: number;
+  source: string;
+  contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;
+  _count?: { votes: number };
+  publishedAt: string | null;
+  createdAt: string;
 }
 
 export interface Category {
@@ -52,6 +69,40 @@ export interface Category {
   slug: string;
   sortOrder: number;
   _count?: { questions: number };
+}
+
+export interface StoreContributor {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  externalId: string | null;
+  status: string;
+  trusted: boolean;
+  _count?: { questions: number; answers: number; votes: number };
+  createdAt: string;
+}
+
+export interface Settings {
+  id?: string;
+  widgetEnabled: boolean;
+  widgetPosition: string;
+  primaryColor: string;
+  allowSubmission: boolean;
+  notifyEmail: string | null;
+  autoPublishQuestions: boolean;
+  manualPublishQuestions: boolean;
+  publishQuestionsAfterTimeEnabled: boolean;
+  publishQuestionsAfterMinutes: number;
+  publishQuestionsAfterHours: number;
+  autoPublishAnswers: boolean;
+  manualPublishAnswers: boolean;
+  publishAnswersAfterTimeEnabled: boolean;
+  publishAnswersAfterMinutes: number;
+  publishAnswersAfterHours: number;
+  autoPublishIfAnswersLessThan: number;
+  autoModeration: boolean;
+  trustedCustomerAutoPublish: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -68,7 +119,12 @@ export interface AnalyticsData {
   totalQuestions: number;
   published: number;
   pending: number;
+  suspended: number;
   categories: number;
+  totalAnswers: number;
+  publishedAnswers: number;
+  totalContributors: number;
+  trustedContributors: number;
 }
 
 export interface ShopCredentials {
@@ -111,7 +167,7 @@ export const shopifyApi = {
     return request<void>(`/questions/${id}`, { method: "DELETE" });
   },
 
-  moderateQuestion(id: string, action: "approve" | "reject") {
+  moderateQuestion(id: string, action: string) {
     return request<{ question: Question }>(`/questions/${id}/moderate`, {
       method: "POST",
       body: JSON.stringify({ action }),
@@ -130,9 +186,80 @@ export const shopifyApi = {
     });
   },
 
+  // Answers
+  getAnswers(questionId: string, params?: Record<string, string>) {
+    const query = new URLSearchParams({ questionId, ...params }).toString();
+    return request<{ answers: Answer[] }>(`/answers?${query}`);
+  },
+
+  createAnswer(data: { questionId: string; answerText: string; status?: string }) {
+    return request<{ answer: Answer }>("/answers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateAnswer(id: string, data: Partial<Answer>) {
+    return request<{ answer: Answer }>(`/answers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteAnswer(id: string) {
+    return request<void>(`/answers/${id}`, { method: "DELETE" });
+  },
+
+  moderateAnswer(id: string, action: string) {
+    return request<{ answer: Answer }>(`/answers/${id}/moderate`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  // Settings
+  getSettings() {
+    return request<{ settings: Settings }>("/settings");
+  },
+
+  updateSettings(data: Partial<Settings>) {
+    return request<{ settings: Settings }>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
   // Analytics
   getAnalytics() {
     return request<AnalyticsData>("/questions/analytics");
+  },
+
+  // Contributors
+  getContributors(params?: Record<string, string>) {
+    const query = params ? "?" + new URLSearchParams(params).toString() : "";
+    return request<{ contributors: StoreContributor[] }>(`/contributors${query}`);
+  },
+
+  updateContributor(id: string, data: Partial<StoreContributor>) {
+    return request<{ contributor: StoreContributor }>(`/contributors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  suspendContributor(id: string) {
+    return request<{ contributor: StoreContributor }>(`/contributors/${id}/suspend`, { method: "POST" });
+  },
+
+  unsuspendContributor(id: string) {
+    return request<{ contributor: StoreContributor }>(`/contributors/${id}/unsuspend`, { method: "POST" });
+  },
+
+  trustContributor(id: string, trusted: boolean) {
+    return request<{ contributor: StoreContributor }>(`/contributors/${id}/trust`, {
+      method: "POST",
+      body: JSON.stringify({ trusted }),
+    });
   },
 
   // Credentials

@@ -9,6 +9,10 @@ const authRoutes = require("./routes/auth");
 const credentialRoutes = require("./routes/credentials");
 const webhookRoutes = require("./routes/webhooks");
 const questionRoutes = require("./routes/questions");
+const settingsRoutes = require("./routes/settings");
+const answerRoutes = require("./routes/answers");
+const voteRoutes = require("./routes/votes");
+const contributorRoutes = require("./routes/contributors");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -27,6 +31,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/credentials", credentialRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/questions", questionRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/answers", answerRoutes);
+app.use("/api/votes", voteRoutes);
+app.use("/api/contributors", contributorRoutes);
 
 // Error handler
 app.use(errorHandler);

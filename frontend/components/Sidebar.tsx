@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/useTheme";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/questions", label: "Questions", icon: "❓" },
+  { href: "/contributors", label: "Contributors", icon: "👥" },
   { href: "/analytics", label: "Analytics", icon: "📈" },
   { href: "/credentials", label: "Shopify Store", icon: "🔗" },
   { href: "/settings", label: "Settings", icon: "⚙️" },

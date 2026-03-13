@@ -175,6 +175,7 @@ export default function QuestionsPage() {
           <option value="pending">Pending</option>
           <option value="rejected">Rejected</option>
           <option value="draft">Draft</option>
+          <option value="suspended">Suspended</option>
         </select>
       </div>
 
@@ -190,6 +191,7 @@ export default function QuestionsPage() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onStatusChange={handleStatusChange}
+            onViewAnswers={(id) => { /* TODO: answer drawer */ }}
           />
         )}
       </div>

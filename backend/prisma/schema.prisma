@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Admin Users (dashboard owners) ─────────────────────────
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -16,24 +17,29 @@ model User {
   shops        Shop[]
 }
 
+// ─── Shopify Stores ─────────────────────────────────────────
 model Shop {
-  id          String     @id @default(cuid())
-  domain      String
-  accessToken String?
-  apiKey      String?
-  name        String?
-  plan        String     @default("free")
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  categories  Category[]
-  questions   Question[]
-  settings    Setting?
-  installedAt DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                String             @id @default(cuid())
+  domain            String
+  accessToken       String?
+  apiKey            String?
+  name              String?
+  plan              String             @default("free")
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories        Category[]
+  questions         Question[]
+  answers           Answer[]
+  votes             Vote[]
+  contributors      StoreContributor[]
+  settings          Setting?
+  installedAt       DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@unique([userId, domain])
 }
 
+// ─── FAQ Categories ─────────────────────────────────────────
 model Category {
   id          String     @id @default(cuid())
   name        String
@@ -49,40 +55,133 @@ model Category {
   @@unique([shopId, slug])
 }
 
+// ─── Questions ──────────────────────────────────────────────
 model Question {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   question      String
-  answer        String   @db.Text
-  status        String   @default("pending") // pending, published, rejected, draft
-  sortOrder     Int      @default(0)
-  views         Int      @default(0)
-  helpful       Int      @default(0)
-  notHelpful    Int      @default(0)
+  answer        String    @db.Text
+  status        String    @default("pending") // pending, published, rejected, draft, suspended
+  sortOrder     Int       @default(0)
+  views         Int       @default(0)
+  helpful       Int       @default(0)
+  notHelpful    Int       @default(0)
+  voteScore     Int       @default(0)
   customerName  String?
   customerEmail String?
   customerPhone String?
-  customerId    String?  // external ID from ecommerce frontend
-  source        String   @default("dashboard") // dashboard, webhook, import
+  customerId    String?
+  contributorId String?
+  contributor   StoreContributor? @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+  source        String    @default("dashboard") // dashboard, webhook, import
   categoryId    String?
   category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   shopId        String
-  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  answers       Answer[]
+  votes         Vote[]    @relation("QuestionVotes")
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([shopId, status])
   @@index([shopId, categoryId])
+  @@index([shopId, voteScore])
   @@index([customerEmail])
 }
 
+// ─── Answers (multiple per question) ────────────────────────
+model Answer {
+  id            String    @id @default(cuid())
+  answerText    String    @db.Text
+  status        String    @default("pending") // pending, published, rejected, suspended
+  voteScore     Int       @default(0)
+  contributorId String?
+  contributor   StoreContributor? @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+  questionId    String
+  question      Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  votes         Vote[]    @relation("AnswerVotes")
+  source        String    @default("dashboard") // dashboard, webhook
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([questionId, status])
+  @@index([shopId])
+}
+
+// ─── Votes (on questions or answers) ────────────────────────
+model Vote {
+  id            String    @id @default(cuid())
+  voteValue     Int       // +1 or -1
+  entityType    String    // "question" or "answer"
+  contributorId String
+  contributor   StoreContributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  questionId    String?
+  question      Question? @relation("QuestionVotes", fields: [questionId], references: [id], onDelete: Cascade)
+  answerId      String?
+  answer        Answer?   @relation("AnswerVotes", fields: [answerId], references: [id], onDelete: Cascade)
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([contributorId, entityType, questionId])
+  @@unique([contributorId, entityType, answerId])
+  @@index([shopId])
+}
+
+// ─── Storefront Contributors (customers who ask/answer/vote) ─
+model StoreContributor {
+  id        String     @id @default(cuid())
+  email     String
+  name      String?
+  phone     String?
+  externalId String?   // ID from ecommerce platform
+  status    String     @default("active") // active, suspended
+  trusted   Boolean    @default(false)
+  shopId    String
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  questions Question[]
+  answers   Answer[]
+  votes     Vote[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([shopId, email])
+  @@index([shopId, status])
+}
+
+// ─── Shop Settings (widget + publishing rules) ──────────────
 model Setting {
-  id              String  @id @default(cuid())
-  shopId          String  @unique
-  shop            Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  widgetEnabled   Boolean @default(true)
-  widgetPosition  String  @default("bottom-right")
-  primaryColor    String  @default("#6366f1")
-  autoModeration  Boolean @default(false)
-  allowSubmission Boolean @default(true)
-  notifyEmail     String?
+  id                          String  @id @default(cuid())
+  shopId                      String  @unique
+  shop                        Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  // Widget config
+  widgetEnabled               Boolean @default(true)
+  widgetPosition              String  @default("bottom-right")
+  primaryColor                String  @default("#6366f1")
+  allowSubmission             Boolean @default(true)
+  notifyEmail                 String?
+
+  // Question publishing
+  autoPublishQuestions        Boolean @default(false)
+  manualPublishQuestions      Boolean @default(true)
+  publishQuestionsAfterTimeEnabled Boolean @default(false)
+  publishQuestionsAfterMinutes    Int     @default(0)
+  publishQuestionsAfterHours      Int     @default(24)
+
+  // Answer publishing
+  autoPublishAnswers          Boolean @default(false)
+  manualPublishAnswers        Boolean @default(true)
+  publishAnswersAfterTimeEnabled  Boolean @default(false)
+  publishAnswersAfterMinutes      Int     @default(0)
+  publishAnswersAfterHours        Int     @default(24)
+  autoPublishIfAnswersLessThan    Int     @default(0) // 0 = disabled
+
+  // Moderation
+  autoModeration              Boolean @default(false)
+  trustedCustomerAutoPublish  Boolean @default(false)
 }

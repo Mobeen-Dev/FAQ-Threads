@@ -30,6 +30,7 @@ Thumbs.db
 # Logs
 logs
 *.log
+chat.md
 
 # Database
 *.db

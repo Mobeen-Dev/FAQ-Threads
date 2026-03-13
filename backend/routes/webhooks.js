@@ -1,22 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../services/prismaClient");
+const contributorService = require("../services/contributorService");
+const settingsService = require("../services/settingsService");
 
 /**
  * POST /api/webhooks/:userId/faq
- * Receive a new FAQ question from a Shopify storefront / ecommerce frontend.
- *
- * Expected JSON body:
- *  {
- *    "question": "How do I return an item?",        // required
- *    "answer":   "",                                 // optional, usually empty from customer
- *    "customer": {                                   // optional customer details
- *      "id":    "cust_abc123",                       // external customer ID
- *      "name":  "Jane Doe",
- *      "email": "jane@example.com",
- *      "phone": "+1-555-123-4567"
- *    }
- *  }
+ * Receive a new FAQ question from a storefront.
  */
 router.post("/:userId/faq", async (req, res) => {
   try {
@@ -28,22 +18,40 @@ router.post("/:userId/faq", async (req, res) => {
     }
 
     const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) {
-      return res.status(404).json({ error: "No shop found for this user" });
-    }
+    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
 
     const customer = payload.customer || {};
+    const customerEmail = customer.email || payload.customerEmail || null;
+
+    // Find or create contributor
+    let contributor = null;
+    if (customerEmail) {
+      contributor = await contributorService.findOrCreateContributor(shop.id, {
+        email: customerEmail,
+        name: customer.name || payload.customerName || null,
+        phone: customer.phone || payload.customerPhone || null,
+        id: customer.id || payload.customerId || null,
+      });
+      if (contributor?.status === "suspended") {
+        return res.status(403).json({ error: "This account has been suspended from submitting questions" });
+      }
+    }
+
+    // Determine status via publishing rules
+    const status = await settingsService.resolveQuestionStatus(shop.id, contributor?.id);
 
     const question = await prisma.question.create({
       data: {
         question: payload.question || payload.title,
         answer: payload.answer || "",
-        status: "pending",
+        status,
         source: "webhook",
         customerName: customer.name || payload.customerName || null,
-        customerEmail: customer.email || payload.customerEmail || null,
+        customerEmail,
         customerPhone: customer.phone || payload.customerPhone || null,
         customerId: customer.id || payload.customerId || null,
+        contributorId: contributor?.id || null,
+        publishedAt: status === "published" ? new Date() : null,
         shopId: shop.id,
       },
     });
@@ -51,7 +59,8 @@ router.post("/:userId/faq", async (req, res) => {
     res.status(201).json({
       success: true,
       questionId: question.id,
-      message: "Question received and queued for review",
+      status: question.status,
+      message: status === "published" ? "Question published" : "Question received and queued for review",
     });
   } catch (error) {
     console.error("Webhook POST error:", error);
@@ -60,37 +69,113 @@ router.post("/:userId/faq", async (req, res) => {
 });
 
 /**
+ * POST /api/webhooks/:userId/answer
+ * Submit an answer from the storefront.
+ */
+router.post("/:userId/answer", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    if (!payload.questionId || !payload.answerText) {
+      return res.status(400).json({ error: "questionId and answerText are required" });
+    }
+
+    const shop = await prisma.shop.findFirst({ where: { userId } });
+    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+
+    const question = await prisma.question.findFirst({ where: { id: payload.questionId, shopId: shop.id } });
+    if (!question) return res.status(404).json({ error: "Question not found" });
+
+    const customer = payload.customer || {};
+    const customerEmail = customer.email || payload.customerEmail || null;
+
+    let contributor = null;
+    if (customerEmail) {
+      contributor = await contributorService.findOrCreateContributor(shop.id, {
+        email: customerEmail,
+        name: customer.name || payload.customerName || null,
+        phone: customer.phone || payload.customerPhone || null,
+        id: customer.id || payload.customerId || null,
+      });
+      if (contributor?.status === "suspended") {
+        return res.status(403).json({ error: "This account has been suspended" });
+      }
+    }
+
+    const status = await settingsService.resolveAnswerStatus(shop.id, payload.questionId, contributor?.id);
+
+    const answer = await prisma.answer.create({
+      data: {
+        answerText: payload.answerText,
+        status,
+        source: "webhook",
+        contributorId: contributor?.id || null,
+        questionId: payload.questionId,
+        shopId: shop.id,
+        publishedAt: status === "published" ? new Date() : null,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      answerId: answer.id,
+      status: answer.status,
+      message: status === "published" ? "Answer published" : "Answer received and queued for review",
+    });
+  } catch (error) {
+    console.error("Webhook answer POST error:", error);
+    res.status(500).json({ error: "Failed to process answer" });
+  }
+});
+
+/**
+ * POST /api/webhooks/:userId/vote
+ * Cast a vote from the storefront.
+ */
+router.post("/:userId/vote", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { entityType, entityId, voteValue, customer } = payload;
+
+    if (!entityType || !entityId || voteValue === undefined || !customer?.email) {
+      return res.status(400).json({ error: "entityType, entityId, voteValue, and customer.email are required" });
+    }
+
+    const shop = await prisma.shop.findFirst({ where: { userId } });
+    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+
+    const contributor = await contributorService.findOrCreateContributor(shop.id, customer);
+    if (contributor?.status === "suspended") {
+      return res.status(403).json({ error: "This account has been suspended" });
+    }
+
+    const voteService = require("../services/voteService");
+    const result = await voteService.castVote(shop.id, contributor.id, entityType, entityId, voteValue);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("Webhook vote error:", error);
+    res.status(500).json({ error: "Failed to process vote" });
+  }
+});
+
+/**
  * PUT /api/webhooks/:userId/faq
- * Update an existing FAQ question (e.g. customer adds more detail).
- *
- * Expected JSON body:
- *  {
- *    "id":       "cuid_of_question",                 // required
- *    "question": "Updated question text",            // optional
- *    "answer":   "Updated answer",                   // optional
- *    "customer": { ... }                             // optional, same shape as POST
- *  }
+ * Update an existing FAQ question.
  */
 router.put("/:userId/faq", async (req, res) => {
   try {
     const { userId } = req.params;
     const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    if (!payload.id) {
-      return res.status(400).json({ error: "Question 'id' is required for updates" });
-    }
+    if (!payload.id) return res.status(400).json({ error: "Question 'id' is required for updates" });
 
     const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) {
-      return res.status(404).json({ error: "No shop found for this user" });
-    }
+    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
 
-    const existing = await prisma.question.findFirst({
-      where: { id: payload.id, shopId: shop.id },
-    });
-    if (!existing) {
-      return res.status(404).json({ error: "Question not found" });
-    }
+    const existing = await prisma.question.findFirst({ where: { id: payload.id, shopId: shop.id } });
+    if (!existing) return res.status(404).json({ error: "Question not found" });
 
     const customer = payload.customer || {};
     const updateData = {};
@@ -117,25 +202,20 @@ router.put("/:userId/faq", async (req, res) => {
 
 /**
  * GET /api/webhooks/:userId/faq
- * Public endpoint: returns published FAQs for embedding on the storefront.
- * Supports optional ?categorySlug= and ?search= query params.
+ * Public endpoint: returns published FAQs sorted by vote score, with answers.
  */
 router.get("/:userId/faq", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { categorySlug, search } = req.query;
+    const { categorySlug, search, sort = "votes" } = req.query;
 
     const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) {
-      return res.status(404).json({ error: "No shop found for this user" });
-    }
+    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
 
     const where = { shopId: shop.id, status: "published" };
 
     if (categorySlug) {
-      const category = await prisma.category.findFirst({
-        where: { shopId: shop.id, slug: categorySlug },
-      });
+      const category = await prisma.category.findFirst({ where: { shopId: shop.id, slug: categorySlug } });
       if (category) where.categoryId = category.id;
     }
 
@@ -146,6 +226,8 @@ router.get("/:userId/faq", async (req, res) => {
       ];
     }
 
+    const orderBy = sort === "newest" ? { createdAt: "desc" } : sort === "views" ? { views: "desc" } : { voteScore: "desc" };
+
     const questions = await prisma.question.findMany({
       where,
       select: {
@@ -155,10 +237,23 @@ router.get("/:userId/faq", async (req, res) => {
         views: true,
         helpful: true,
         notHelpful: true,
+        voteScore: true,
         category: { select: { name: true, slug: true } },
+        answers: {
+          where: { status: "published" },
+          select: {
+            id: true,
+            answerText: true,
+            voteScore: true,
+            contributor: { select: { name: true } },
+            createdAt: true,
+          },
+          orderBy: { voteScore: "desc" },
+        },
+        _count: { select: { answers: true } },
         createdAt: true,
       },
-      orderBy: { sortOrder: "asc" },
+      orderBy,
     });
 
     res.json({ faqs: questions, total: questions.length });
