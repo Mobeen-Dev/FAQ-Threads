@@ -1,0 +1,39 @@
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+require("dotenv").config();
+
+const authRoutes = require("./routes/auth");
+const credentialRoutes = require("./routes/credentials");
+const webhookRoutes = require("./routes/webhooks");
+const questionRoutes = require("./routes/questions");
+const errorHandler = require("./middleware/errorHandler");
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+app.use(helmet());
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+app.use(morgan("dev"));
+app.use(express.json());
+
+// Health check
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/credentials", credentialRoutes);
+app.use("/api/webhooks", webhookRoutes);
+app.use("/api/questions", questionRoutes);
+
+// Error handler
+app.use(errorHandler);
+
+const server = http.createServer(app);
+server.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+});
+
+module.exports = { app, server };

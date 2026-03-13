@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  shops        Shop[]
+}
+
+model Shop {
+  id          String     @id @default(cuid())
+  domain      String
+  accessToken String?
+  apiKey      String?
+  name        String?
+  plan        String     @default("free")
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories  Category[]
+  questions   Question[]
+  settings    Setting?
+  installedAt DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([userId, domain])
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  slug        String
+  sortOrder   Int        @default(0)
+  shopId      String
+  shop        Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([shopId, slug])
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  question      String
+  answer        String   @db.Text
+  status        String   @default("pending") // pending, published, rejected, draft
+  sortOrder     Int      @default(0)
+  views         Int      @default(0)
+  helpful       Int      @default(0)
+  notHelpful    Int      @default(0)
+  customerName  String?
+  customerEmail String?
+  customerPhone String?
+  customerId    String?  // external ID from ecommerce frontend
+  source        String   @default("dashboard") // dashboard, webhook, import
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shopId, status])
+  @@index([shopId, categoryId])
+  @@index([customerEmail])
+}
+
+model Setting {
+  id              String  @id @default(cuid())
+  shopId          String  @unique
+  shop            Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  widgetEnabled   Boolean @default(true)
+  widgetPosition  String  @default("bottom-right")
+  primaryColor    String  @default("#6366f1")
+  autoModeration  Boolean @default(false)
+  allowSubmission Boolean @default(true)
+  notifyEmail     String?
+}
