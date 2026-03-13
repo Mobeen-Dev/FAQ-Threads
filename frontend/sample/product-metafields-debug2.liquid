@@ -1,0 +1,176 @@
+<section class="product-metafields-debug">
+  <style>
+    .product-metafields-debug {
+      padding: 1.5rem;
+      border: 1px solid #e5e5e5;
+      margin: 1.5rem 0;
+      font-family: monospace;
+      font-size: 0.9rem;
+      background: #fafafa;
+      overflow-x: auto;
+    }
+
+    .product-metafields-debug h2,
+    .product-metafields-debug h3 {
+      margin: 0 0 0.5rem;
+      font-family: sans-serif;
+    }
+
+    .product-metafields-debug pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #fff;
+      padding: 0.75rem;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      max-height: 400px;
+      overflow: auto;
+    }
+
+    .product-metafields-debug .debug-line {
+      margin: 0.25rem 0;
+    }
+
+    .product-metafields-debug .debug-label {
+      font-weight: bold;
+    }
+  </style>
+
+  {% if product %}
+    <h2>Product metafields debug</h2>
+
+    <div class="debug-line">
+      <span class="debug-label">Product ID:</span>
+      {{ product.id }}
+    </div>
+
+    {%- comment -%}
+      1. Try to access the FAQ metafield directly.
+      Adjust namespace/key here if your metafield uses a different namespace or key.
+    {%- endcomment -%}
+    {% assign faq_metafield = product.metafields.app--333151272961.faq_items %}
+
+
+    <div class="debug-line">
+      <span class="debug-label">Has product.metafields?</span>
+      {% if product.metafields %}
+        yes
+      {% else %}
+        no
+      {% endif %}
+    </div>
+
+    <div class="debug-line">
+      <span class="debug-label">Has product.metafields.app.faq_items?</span>
+      {% if faq_metafield %}
+        yes
+      {% else %}
+        no
+      {% endif %}
+    </div>
+
+    {% if faq_metafield %}
+      <h3>FAQ metafield (product.metafields.app.faq_items)</h3>
+
+      <div class="debug-line">
+        <span class="debug-label">Namespace:</span>
+        {{ faq_metafield.namespace }}
+      </div>
+
+      <div class="debug-line">
+        <span class="debug-label">Key:</span>
+        {{ faq_metafield.key }}
+      </div>
+
+      <div class="debug-line">
+        <span class="debug-label">Type:</span>
+        {{ faq_metafield.type }}
+      </div>
+
+      <div class="debug-line">
+        <span class="debug-label">Raw value output:</span>
+        {% if faq_metafield.value != blank %}
+          {{ faq_metafield.value }}
+        {% else %}
+          <em>blank</em>
+        {% endif %}
+      </div>
+
+      {%- comment -%}
+        2. If this is a list.metaobject_reference, faq_metafield.value should be
+           an array-like structure. Try looping over it as FAQ items.
+      {%- endcomment -%}
+      <h3>FAQ items (looping over faq_metafield.value)</h3>
+
+      {% if faq_metafield.value %}
+        {% assign faq_list = faq_metafield.value %}
+
+        <div class="debug-line">
+          <span class="debug-label">faq_list size:</span>
+          {{ faq_list | size }}
+        </div>
+
+        {% for faq_item in faq_list %}
+          <div style="margin: 0.75rem 0; padding: 0.5rem; border: 1px dashed #ccc;">
+            <div class="debug-line">
+              <span class="debug-label">Item index:</span> {{ forloop.index0 }}
+            </div>
+
+            <div class="debug-line">
+              <span class="debug-label">Status field:</span>
+              {% if faq_item.status and faq_item.status.value %}
+                {{ faq_item.status.value }}
+              {% else %}
+                <em>no status field or empty</em>
+              {% endif %}
+            </div>
+
+            <div class="debug-line">
+              <span class="debug-label">Question field:</span>
+              {% if faq_item.question and faq_item.question.value %}
+                {{ faq_item.question.value }}
+              {% else %}
+                <em>no question field or empty</em>
+              {% endif %}
+            </div>
+
+            <div class="debug-line">
+              <span class="debug-label">Answer field:</span>
+              {% if faq_item.answer and faq_item.answer.value %}
+                {{ faq_item.answer.value }}
+              {% else %}
+                <em>no answer field or empty</em>
+              {% endif %}
+            </div>
+
+            <div class="debug-line">
+              <span class="debug-label">External ID field:</span>
+              {% if faq_item.external_id and faq_item.external_id.value %}
+                {{ faq_item.external_id.value }}
+              {% else %}
+                <em>no external_id field or empty</em>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p>No value found on faq_metafield (it might not be set on this product).</p>
+      {% endif %}
+    {% else %}
+      <p><strong>Note:</strong> product.metafields.app.faq_items is not set or not accessible. Check the metafield namespace and key in your Admin.</p>
+    {% endif %}
+  {% else %}
+    <p><strong>Warning:</strong> No product object is available in this context.</p>
+  {% endif %}
+</section>
+
+{% schema %}
+{
+  "name": "Product metafields debug2",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": []
+}
+{% endschema %}

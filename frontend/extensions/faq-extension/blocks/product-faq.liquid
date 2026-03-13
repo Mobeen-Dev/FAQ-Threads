@@ -1,0 +1,120 @@
+{% liquid
+  assign webhook_url = block.settings.webhook_url | strip
+  assign login_path = '/account/login'
+  assign return_path = request.path | url_encode
+  assign login_url = login_path | append: '?return_url=' | append: return_path
+%}
+
+<section class="faq-widget-wrapper" {{ block.shopify_attributes }}>
+  {% if product %}
+    <div
+      id="faq-widget-{{ block.id }}"
+      class="faq-widget"
+      data-faq-root="true"
+      data-webhook-url="{{ webhook_url | escape }}"
+      data-product-id="{{ product.id }}"
+      data-product-handle="{{ product.handle | escape }}"
+      data-product-title="{{ product.title | escape }}"
+      data-customer-logged-in="{% if customer %}true{% else %}false{% endif %}"
+      data-customer-id="{% if customer %}{{ customer.id }}{% endif %}"
+      data-customer-name="{% if customer %}{{ customer.name | default: customer.first_name | escape }}{% endif %}"
+      data-customer-email="{% if customer %}{{ customer.email | escape }}{% endif %}"
+      data-customer-phone="{% if customer and customer.phone %}{{ customer.phone | escape }}{% endif %}"
+      data-login-url="{{ login_url | escape }}"
+      data-title="{{ block.settings.heading | escape }}"
+      data-subtitle="{{ block.settings.subheading | escape }}"
+      data-sort="{{ block.settings.sort }}"
+      data-max-inline-answers="{{ block.settings.max_inline_answers }}"
+      data-lazy-root-margin="{{ block.settings.lazy_root_margin | escape }}"
+      data-loading-text="{{ block.settings.loading_text | escape }}"
+    >
+      <div class="faq-widget__shell" aria-live="polite">
+        <h2 class="faq-widget__title">{{ block.settings.heading }}</h2>
+        {% if block.settings.subheading != blank %}
+          <p class="faq-widget__subtitle">{{ block.settings.subheading }}</p>
+        {% endif %}
+        {% if webhook_url == blank %}
+          <p class="faq-widget__status">
+            {% if request.design_mode %}
+              Add your webhook URL in this block settings to load FAQs.
+            {% else %}
+              FAQs are unavailable right now.
+            {% endif %}
+          </p>
+        {% else %}
+          <p class="faq-widget__status">{{ block.settings.loading_text }}</p>
+        {% endif %}
+      </div>
+    </div>
+  {% elsif request.design_mode %}
+    <p class="faq-widget__editor-note">
+      This app block is intended for product templates where the <code>product</code> object exists.
+    </p>
+  {% endif %}
+</section>
+
+{{ 'faq.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'faq.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Product FAQ",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "webhook_url",
+      "label": "Webhook URL",
+      "info": "Paste the URL from your app credentials page. Example: https://your-api.com/api/webhooks/<userId>/faq"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Product FAQs"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Questions from shoppers and answers from the community."
+    },
+    {
+      "type": "select",
+      "id": "sort",
+      "label": "Sort order",
+      "default": "votes",
+      "options": [
+        { "value": "votes", "label": "Most helpful" },
+        { "value": "newest", "label": "Newest first" },
+        { "value": "views", "label": "Most viewed" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "max_inline_answers",
+      "label": "Inline extra answers",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "text",
+      "id": "lazy_root_margin",
+      "label": "Lazy-load root margin",
+      "default": "220px 0px",
+      "info": "Controls how early FAQs load before scrolling into view."
+    },
+    {
+      "type": "text",
+      "id": "loading_text",
+      "label": "Loading text",
+      "default": "Loading frequently asked questions..."
+    }
+  ]
+}
+{% endschema %}
