@@ -13,13 +13,20 @@ const settingsRoutes = require("./routes/settings");
 const answerRoutes = require("./routes/answers");
 const voteRoutes = require("./routes/votes");
 const contributorRoutes = require("./routes/contributors");
+const { resolveCorsOptions } = require("./services/corsService");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+app.use(
+  cors((req, callback) => {
+    resolveCorsOptions(req)
+      .then((options) => callback(null, options))
+      .catch((error) => callback(error));
+  })
+);
 app.use(morgan("dev"));
 app.use(express.json());
 

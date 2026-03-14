@@ -489,12 +489,14 @@ Save or update Shopify shop credentials.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `domain` | string | ✅ Yes | Shopify store domain |
+| `domain` | string | ✅ Yes | Shopify store domain (also used to allow storefront webhook CORS origin) |
 | `apiKey` | string | No | Shopify API key |
 | `accessToken` | string | No | Shopify access token |
 | `name` | string | No | Display name for the shop |
 
 **Response `200`:** Same as GET response.
+
+> **CORS Note:** Webhook endpoints (`/api/webhooks/:userId/*`) allow browser requests when the request `Origin` matches any Shopify `domain` saved under that user. Save the exact storefront domain (for example: `app-development-store-grow.myshopify.com`).
 
 #### DELETE `/api/credentials`
 
@@ -1399,7 +1401,18 @@ if (result.success) {
 
 ### CORS
 
-The backend enables CORS for all origins. No special headers needed beyond `Content-Type: application/json`.
+The backend uses dynamic CORS:
+
+- Dashboard/auth endpoints allow `FRONTEND_URL` and optional `ALLOWED_ORIGINS` (comma-separated env var).
+- Webhook endpoints (`/api/webhooks/:userId/*`) allow requests when `Origin` matches a saved shop domain for that `userId`.
+- Requests without an `Origin` header (server-to-server calls, CLI tests) are allowed.
+
+Example backend env:
+
+```env
+FRONTEND_URL=http://localhost:3000
+ALLOWED_ORIGINS=https://admin.example.com,https://staging-admin.example.com
+```
 
 ---
 
