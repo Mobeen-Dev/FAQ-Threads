@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm from "@/components/QuestionForm";
 import QuestionTable from "@/components/QuestionTable";
 import { useFetch } from "@/hooks/useFetch";
@@ -9,6 +10,9 @@ import { shopifyApi, type PaginatedResponse, type Question, type Category } from
 
 export default function QuestionsPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<{
@@ -17,9 +21,28 @@ export default function QuestionsPage() {
     categoryId?: string;
     status?: string;
   } | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [saving, setSaving] = useState(false);
+  const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
+  const [openQuestion, setOpenQuestion] = useState<Question | null>(null);
+  const [openingQuestion, setOpeningQuestion] = useState(false);
+  const modalCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!openQuestionId) return;
+    modalCloseButtonRef.current?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenQuestionId(null);
+        setOpenQuestion(null);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [openQuestionId]);
 
   const { data: questionsData, loading, refetch } = useFetch<PaginatedResponse<Question>>(
     () => {
@@ -61,6 +84,9 @@ export default function QuestionsPage() {
       setEditingId(null);
       setEditingData(null);
       refetch();
+      if (openQuestionId === editingId) {
+        await handleOpenQuestion(editingId);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update question");
     } finally {
@@ -79,6 +105,8 @@ export default function QuestionsPage() {
       });
       setEditingId(id);
       setShowForm(true);
+      setOpenQuestionId(null);
+      setOpenQuestion(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to load question");
     }
@@ -88,6 +116,10 @@ export default function QuestionsPage() {
     if (!confirm("Delete this question?")) return;
     try {
       await shopifyApi.deleteQuestion(id);
+      if (openQuestionId === id) {
+        setOpenQuestionId(null);
+        setOpenQuestion(null);
+      }
       refetch();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete");
@@ -98,6 +130,9 @@ export default function QuestionsPage() {
     try {
       await shopifyApi.updateQuestion(id, { status });
       refetch();
+      if (openQuestionId === id) {
+        setOpenQuestion((prev) => (prev ? { ...prev, status } : prev));
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update status");
     }
@@ -111,6 +146,21 @@ export default function QuestionsPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create category");
       return null;
+    }
+  };
+
+  const handleOpenQuestion = async (id: string) => {
+    setOpenQuestionId(id);
+    setOpeningQuestion(true);
+    try {
+      const { question } = await shopifyApi.getQuestion(id);
+      setOpenQuestion(question);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to load question details");
+      setOpenQuestionId(null);
+      setOpenQuestion(null);
+    } finally {
+      setOpeningQuestion(false);
     }
   };
 
@@ -156,7 +206,6 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex gap-4 mb-6">
         <input
           type="text"
@@ -179,7 +228,6 @@ export default function QuestionsPage() {
         </select>
       </div>
 
-      {/* Question List */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -188,19 +236,113 @@ export default function QuestionsPage() {
         ) : (
           <QuestionTable
             questions={questions}
+            onOpen={handleOpenQuestion}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onStatusChange={handleStatusChange}
-            onViewAnswers={(id) => { /* TODO: answer drawer */ }}
+            onViewAnswers={(id) => router.push(`/answers?questionId=${id}`)}
           />
         )}
       </div>
 
-      {/* Pagination info */}
       {questionsData?.pagination && (
         <div className="mt-4 text-sm text-stone-500 dark:text-zinc-400 text-center">
           Showing {questions.length} of {questionsData.pagination.total} questions
           (Page {questionsData.pagination.page} of {questionsData.pagination.totalPages})
+        </div>
+      )}
+
+      {openQuestionId && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => {
+            setOpenQuestionId(null);
+            setOpenQuestion(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="question-details-title"
+            className="w-full max-w-3xl bg-white dark:bg-zinc-900 rounded-3xl border border-stone-200 dark:border-zinc-800 shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {openingQuestion || !openQuestion ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <h2 id="question-details-title" className="text-xl font-semibold text-stone-900 dark:text-zinc-100">{openQuestion.question}</h2>
+                  <button
+                    ref={modalCloseButtonRef}
+                    onClick={() => {
+                      setOpenQuestionId(null);
+                      setOpenQuestion(null);
+                    }}
+                    aria-label="Close question details dialog"
+                    className="w-9 h-9 rounded-xl hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-500 dark:text-zinc-400"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-stone-50 dark:bg-zinc-800/50 rounded-2xl p-4">
+                    <p className="text-sm text-stone-600 dark:text-zinc-400 mb-1">Answer</p>
+                    <p className="text-stone-900 dark:text-zinc-100 whitespace-pre-wrap">{openQuestion.answer || "No answer yet"}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <select
+                      value={openQuestion.status}
+                      onChange={(e) => handleStatusChange(openQuestion.id, e.target.value)}
+                      className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100"
+                    >
+                      <option value="published">Published</option>
+                      <option value="pending">Pending</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="draft">Draft</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                    <span className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300">
+                      👁 {openQuestion.views} views
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
+                      💬 {openQuestion._count?.answers ?? 0} answers
+                    </span>
+                    {openQuestion.category?.name && (
+                      <span className="px-2.5 py-1 rounded-lg bg-stone-100 dark:bg-zinc-800 text-stone-700 dark:text-zinc-300">
+                        {openQuestion.category.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      onClick={() => router.push(`/answers?questionId=${openQuestion.id}`)}
+                      className="px-4 py-2.5 rounded-xl border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                    >
+                      Review Answers
+                    </button>
+                    <button
+                      onClick={() => handleEdit(openQuestion.id)}
+                      className="px-4 py-2.5 rounded-xl border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800"
+                    >
+                      Edit Question
+                    </button>
+                    <button
+                      onClick={() => handleDelete(openQuestion.id)}
+                      className="px-4 py-2.5 rounded-xl border border-rose-300 dark:border-rose-700 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

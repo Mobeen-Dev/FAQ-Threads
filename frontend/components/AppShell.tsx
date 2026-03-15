@@ -1,17 +1,28 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/useTheme";
 import Sidebar from "@/components/Sidebar";
+import { useEffect } from "react";
+import Link from "next/link";
 
 const publicPaths = ["/login", "/signup"];
 
 function AppContent({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
+  const router = useRouter();
 
   const isPublicPage = publicPaths.includes(pathname);
+
+  useEffect(() => {
+    if (!loading && !isPublicPage && !user) {
+      router.replace("/login");
+    }
+  }, [loading, isPublicPage, user, router]);
 
   if (loading) {
     return (
@@ -25,17 +36,56 @@ function AppContent({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (!user) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <div className="flex min-h-screen bg-stone-50 dark:bg-zinc-950">
-      <Sidebar />
-      <main className="flex-1 p-8 text-stone-900 dark:text-zinc-100">{children}</main>
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="lg:hidden sticky top-0 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur border-b border-stone-200 dark:border-zinc-800">
+          <div className="px-3 py-2 flex items-center gap-2 overflow-x-auto">
+            {[
+              { href: "/dashboard", label: "📊" },
+              { href: "/questions", label: "❓" },
+              { href: "/answers", label: "💬" },
+              { href: "/contributors", label: "👥" },
+              { href: "/analytics", label: "📈" },
+              { href: "/settings", label: "⚙️" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                  pathname === item.href
+                    ? "bg-teal-600 text-white"
+                    : "bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <button
+              onClick={toggleTheme}
+              className="shrink-0 w-10 h-10 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
+            <button
+              onClick={logout}
+              className="shrink-0 w-10 h-10 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
+              aria-label="Sign out"
+            >
+              🚪
+            </button>
+          </div>
+        </div>
+
+        <main className="p-4 sm:p-6 lg:p-8 text-stone-900 dark:text-zinc-100">{children}</main>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface Question {
 
 interface QuestionTableProps {
   questions: Question[];
+  onOpen: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: string) => void;
@@ -62,7 +63,11 @@ function ActionMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        aria-label="Question actions"
         className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-stone-100 dark:hover:bg-zinc-700 text-stone-500 dark:text-zinc-400 transition-colors"
         title="Actions"
       >
@@ -92,7 +97,7 @@ function ActionMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
   );
 }
 
-export default function QuestionTable({ questions, onEdit, onDelete, onStatusChange, onViewAnswers }: QuestionTableProps) {
+export default function QuestionTable({ questions, onOpen, onEdit, onDelete, onStatusChange, onViewAnswers }: QuestionTableProps) {
   if (questions.length === 0) {
     return (
       <div className="text-center py-16 text-stone-500 dark:text-zinc-400">
@@ -109,7 +114,19 @@ export default function QuestionTable({ questions, onEdit, onDelete, onStatusCha
         const style = statusStyles[q.status] || statusStyles.draft;
         const answerCount = q._count?.answers ?? 0;
         return (
-          <div key={q.id} className="px-5 py-4 hover:bg-stone-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+          <div
+            key={q.id}
+            onClick={() => onOpen(q.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen(q.id);
+              }
+            }}
+            className="px-5 py-4 hover:bg-stone-50/50 dark:hover:bg-zinc-800/30 transition-colors cursor-pointer"
+          >
             <div className="flex items-start gap-4">
               {/* Vote score */}
               <div className="flex flex-col items-center min-w-[40px] pt-0.5">
@@ -141,7 +158,11 @@ export default function QuestionTable({ questions, onEdit, onDelete, onStatusCha
                   <span className="text-xs text-stone-400 dark:text-zinc-500">👁 {q.views}</span>
                   {answerCount > 0 && (
                     <button
-                      onClick={() => onViewAnswers?.(q.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewAnswers?.(q.id);
+                      }}
+                      aria-label={`View answers for question ${q.question}`}
                       className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
                     >
                       💬 {answerCount} {answerCount === 1 ? "answer" : "answers"}
@@ -161,6 +182,7 @@ export default function QuestionTable({ questions, onEdit, onDelete, onStatusCha
                   <span className={`w-2 h-2 rounded-full ${style.dot} ml-1.5`} />
                   <select
                     value={q.status}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => onStatusChange(q.id, e.target.value)}
                     className="text-xs font-medium py-1.5 pr-5 bg-transparent border-none outline-none cursor-pointer appearance-none"
                   >

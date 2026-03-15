@@ -1,17 +1,52 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import StatCard from "@/components/StatCard";
 import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type AnalyticsData } from "@/services/shopifyApi";
+import Link from "next/link";
+
+const DEADLINE = new Date("2026-11-12T00:00:00");
+
+function getCountdownParts(now: Date, target: Date) {
+  if (now >= target) return { months: 0, weeks: 0, days: 0, complete: true };
+
+  const cursor = new Date(now.getTime());
+  let months = 0;
+  while (true) {
+    const next = new Date(cursor.getTime());
+    next.setMonth(next.getMonth() + 1);
+    if (next <= target) {
+      months += 1;
+      cursor.setTime(next.getTime());
+      continue;
+    }
+    break;
+  }
+
+  const remainingMs = target.getTime() - cursor.getTime();
+  const totalDays = Math.max(0, Math.floor(remainingMs / (1000 * 60 * 60 * 24)));
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+  return { months, weeks, days, complete: false };
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [now, setNow] = useState(() => new Date());
 
   const { data, loading, error } = useFetch<AnalyticsData>(
     () => shopifyApi.getAnalytics(),
     [user?.id]
   );
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const countdown = useMemo(() => getCountdownParts(now, DEADLINE), [now]);
 
   if (!user) return null;
 
@@ -27,20 +62,32 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-bold text-stone-900 dark:text-zinc-100 mb-6">Dashboard</h1>
 
+      <div className="rounded-2xl border border-pink-200 dark:border-pink-900/60 bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-900 p-4 mb-6">
+        <p className="text-sm uppercase tracking-wide text-pink-600 dark:text-pink-300 font-semibold">Celebration Countdown</p>
+        {countdown.complete ? (
+          <p className="text-lg font-semibold text-stone-900 dark:text-zinc-100 mt-1">🎉 It&apos;s the day! Happy celebration!</p>
+        ) : (
+          <p className="text-lg font-semibold text-stone-900 dark:text-zinc-100 mt-1">
+            {countdown.months} month{countdown.months === 1 ? "" : "s"} {countdown.weeks} week{countdown.weeks === 1 ? "" : "s"} {countdown.days} day{countdown.days === 1 ? "" : "s"}
+          </p>
+        )}
+        <p className="text-xs text-stone-500 dark:text-zinc-400 mt-1">Target date: 12 November 2026</p>
+      </div>
+
       {/* Primary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Questions" value={data?.totalQuestions ?? 0} icon="❓" color="bg-teal-500" />
-        <StatCard title="Published" value={data?.published ?? 0} icon="✅" color="bg-emerald-500" />
-        <StatCard title="Pending Review" value={data?.pending ?? 0} icon="⏳" color="bg-amber-500" />
-        <StatCard title="Categories" value={data?.categories ?? 0} icon="📁" color="bg-violet-500" />
+        <StatCard title="Total Questions" value={data?.totalQuestions ?? 0} icon="❓" color="bg-teal-500" href="/questions" />
+        <StatCard title="Published" value={data?.published ?? 0} icon="✅" color="bg-emerald-500" href="/questions?status=published" />
+        <StatCard title="Pending Review" value={data?.pending ?? 0} icon="⏳" color="bg-amber-500" href="/questions?status=pending" />
+        <StatCard title="Categories" value={data?.categories ?? 0} icon="📁" color="bg-violet-500" href="/questions" />
       </div>
 
       {/* New: Answers & Contributors */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Answers" value={data?.totalAnswers ?? 0} icon="💬" color="bg-sky-500" />
-        <StatCard title="Published Answers" value={data?.publishedAnswers ?? 0} icon="📢" color="bg-emerald-500" />
-        <StatCard title="Contributors" value={data?.totalContributors ?? 0} icon="👥" color="bg-teal-500" />
-        <StatCard title="Trusted" value={data?.trustedContributors ?? 0} icon="⭐" color="bg-violet-500" />
+        <StatCard title="Total Answers" value={data?.totalAnswers ?? 0} icon="💬" color="bg-sky-500" href="/answers" />
+        <StatCard title="Published Answers" value={data?.publishedAnswers ?? 0} icon="📢" color="bg-emerald-500" href="/answers?status=published" />
+        <StatCard title="Contributors" value={data?.totalContributors ?? 0} icon="👥" color="bg-teal-500" href="/contributors" />
+        <StatCard title="Trusted" value={data?.trustedContributors ?? 0} icon="⭐" color="bg-violet-500" href="/contributors?trusted=true" />
       </div>
 
       {/* Suspended warning */}
@@ -58,18 +105,18 @@ export default function DashboardPage() {
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800 p-6">
           <h2 className="text-lg font-semibold mb-4 text-stone-900 dark:text-zinc-100">Quick Actions</h2>
           <div className="space-y-3">
-            <a href="/questions" className="block px-4 py-3 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors">
+            <Link href="/questions" className="block px-4 py-3 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-colors">
               ➕ Add New Question
-            </a>
-            <a href="/questions?status=pending" className="block px-4 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
+            </Link>
+            <Link href="/questions?status=pending" className="block px-4 py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
               👀 Review Pending Questions ({data?.pending ?? 0})
-            </a>
-            <a href="/contributors" className="block px-4 py-3 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors">
+            </Link>
+            <Link href="/contributors" className="block px-4 py-3 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 rounded-xl hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors">
               👥 Manage Contributors
-            </a>
-            <a href="/analytics" className="block px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+            </Link>
+            <Link href="/analytics" className="block px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
               📈 View Analytics
-            </a>
+            </Link>
           </div>
         </div>
 
