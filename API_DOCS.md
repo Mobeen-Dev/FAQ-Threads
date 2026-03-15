@@ -183,6 +183,9 @@ A storefront visitor submits a new FAQ question.
 {
   "question": "How long does shipping take?",
   "answer": null,
+  "productId": "9440623329521",
+  "productHandle": "st3p-a-b-analogue-timer-time-delay-relay-in-pakistan",
+  "productTitle": "ST3P A/B Analogue Timer Time Delay Relay",
   "customer": {
     "email": "jane@example.com",
     "name": "Jane Smith",
@@ -196,6 +199,9 @@ A storefront visitor submits a new FAQ question.
 |-------|------|----------|-------------|
 | `question` | string | ✅ Yes | The question text. Also accepts `title` as alias. |
 | `answer` | string | No | Optional answer (for pre-answered submissions) |
+| `productId` | string | Recommended | Product ID from storefront context. Enables product-scoped FAQ retrieval. |
+| `productHandle` | string | Recommended | Product handle/slug. Used for product-scoped retrieval fallback. |
+| `productTitle` | string | No | Product title for context/debugging. |
 | `customer` | object | No | Customer details (highly recommended) |
 | `customer.email` | string | Recommended | Creates/finds a contributor record |
 | `customer.name` | string | No | Display name |
@@ -358,10 +364,12 @@ Retrieve all published FAQs for display on the storefront. **Only returns publis
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `categorySlug` | string | — | Filter by category slug |
+| `productId` | string | — | Filter to a specific product ID (exact match). |
+| `productHandle` | string | — | Filter to a specific product handle (used when `productId` is not supplied). |
 | `search` | string | — | Search in question and answer text |
 | `sort` | string | `"votes"` | Sort order: `"votes"`, `"newest"`, `"views"` |
 
-**Example:** `GET /api/webhooks/cm1user123/faq?sort=votes&categorySlug=shipping`
+**Example:** `GET /api/webhooks/cm1user123/faq?sort=votes&productId=9440623329521`
 
 **Response `200`:**
 ```json
@@ -402,6 +410,7 @@ Retrieve all published FAQs for display on the storefront. **Only returns publis
 
 **Important Notes:**
 - Only questions with status `"published"` are returned
+- If `productId` or `productHandle` is provided, only FAQs for that product are returned
 - Only answers with status `"published"` are included
 - Customer email, phone, and external ID are **never** exposed
 - Answers are sorted by `voteScore` descending (best answers first)
@@ -421,6 +430,8 @@ Update an existing question (typically used by the question author).
   "id": "cm1question789",
   "question": "Updated: How long does express shipping take?",
   "answer": "Express shipping takes 1-2 business days.",
+  "productId": "9440623329521",
+  "productHandle": "st3p-a-b-analogue-timer-time-delay-relay-in-pakistan",
   "customer": {
     "email": "jane@example.com"
   }
@@ -1053,6 +1064,9 @@ views           Int       View count
 helpful         Int       Helpful vote count (legacy)
 notHelpful      Int       Not helpful count (legacy)
 voteScore       Int       Net score from votes (+1/-1 system)
+productId       String?   Product ID associated with the question
+productHandle   String?   Product handle/slug associated with the question
+productTitle    String?   Product title snapshot at submission time
 customerName    String?   Name of the person who asked
 customerEmail   String?   Email of the person who asked
 customerPhone   String?   Phone of the person who asked

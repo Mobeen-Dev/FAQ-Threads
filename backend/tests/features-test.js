@@ -89,6 +89,8 @@ async function testSettings() {
   });
   assert(r.status === 200, "PUT /settings returns 200");
   assert(r.data.settings.autoPublishQuestions === true, "Updated autoPublishQuestions");
+  assert(r.data.settings.manualPublishQuestions === false, "Mode exclusivity: manual off when auto on");
+  assert(r.data.settings.publishQuestionsAfterTimeEnabled === false, "Mode exclusivity: time off when auto on");
   assert(r.data.settings.trustedCustomerAutoPublish === true, "Updated trustedCustomerAutoPublish");
   assert(r.data.settings.autoPublishIfAnswersLessThan === 3, "Updated autoPublishIfAnswersLessThan");
 
@@ -100,8 +102,12 @@ async function testSettings() {
   // Reset to manual for other tests
   await req("PUT", "/settings", {
     autoPublishQuestions: false,
-    trustedCustomerAutoPublish: false,
     manualPublishQuestions: true,
+    publishQuestionsAfterTimeEnabled: false,
+    autoPublishAnswers: false,
+    manualPublishAnswers: true,
+    publishAnswersAfterTimeEnabled: false,
+    trustedCustomerAutoPublish: false,
   });
 }
 
@@ -205,6 +211,9 @@ async function testAnswers() {
 async function testWebhooks() {
   console.log("\n═══ WEBHOOKS ═══");
 
+  // Make webhook-submitted questions published so they are visible in public FAQ GET assertions.
+  await req("PUT", "/settings", { autoPublishQuestions: true, manualPublishQuestions: false });
+
   // Submit question via webhook (with customer)
   let r = await req("POST", `/webhooks/${USER_ID}/faq`, {
     question: "Webhook Q from customer?",
@@ -240,6 +249,44 @@ async function testWebhooks() {
     customer: { email: "voter@test.com" },
   });
   assert(r.status === 200 || r.status === 201, "Webhook vote submission");
+
+  // Product-scoped retrieval regression test
+  const productTag = `prod-scope-${Date.now()}`;
+  const questionA = `${productTag}-A`;
+  const questionB = `${productTag}-B`;
+
+  r = await req("POST", `/webhooks/${USER_ID}/faq`, {
+    question: questionA,
+    productId: "product-111",
+    productHandle: "product-a",
+    customer: { email: "product-a@test.com", name: "Product A User" },
+  });
+  assert(r.status === 201, "Webhook POST product A question");
+  assert(r.data.status === "published", "Product A question published");
+
+  r = await req("POST", `/webhooks/${USER_ID}/faq`, {
+    question: questionB,
+    productId: "product-222",
+    productHandle: "product-b",
+    customer: { email: "product-b@test.com", name: "Product B User" },
+  });
+  assert(r.status === 201, "Webhook POST product B question");
+  assert(r.data.status === "published", "Product B question published");
+
+  r = await req("GET", `/webhooks/${USER_ID}/faq?productId=product-111&search=${encodeURIComponent(productTag)}`);
+  const productAQuestions = (r.data.faqs || []).map((faq) => faq.question);
+  assert(r.status === 200, "Webhook GET with productId works");
+  assert(productAQuestions.includes(questionA), "Product A fetch includes product A question");
+  assert(!productAQuestions.includes(questionB), "Product A fetch excludes product B question");
+
+  r = await req("GET", `/webhooks/${USER_ID}/faq?productHandle=product-b&search=${encodeURIComponent(productTag)}`);
+  const productBQuestions = (r.data.faqs || []).map((faq) => faq.question);
+  assert(r.status === 200, "Webhook GET with productHandle works");
+  assert(productBQuestions.includes(questionB), "Product B fetch includes product B question");
+  assert(!productBQuestions.includes(questionA), "Product B fetch excludes product A question");
+
+  // Reset webhook publishing behavior for later tests.
+  await req("PUT", "/settings", { autoPublishQuestions: false, manualPublishQuestions: true });
 }
 
 // ─── Contributors ────────────────────────────────────────────────────
@@ -385,6 +432,36 @@ async function testPublishingRules() {
     autoPublishQuestions: false,
     trustedCustomerAutoPublish: false,
     manualPublishQuestions: true,
+  });
+
+  // Time-based mode (0 delay): starts pending, becomes published on next retrieval
+  let settingsR = await req("PUT", "/settings", {
+    autoPublishQuestions: false,
+    manualPublishQuestions: false,
+    publishQuestionsAfterTimeEnabled: true,
+    publishQuestionsAfterHours: 0,
+    publishQuestionsAfterMinutes: 0,
+  });
+  assert(settingsR.data.settings.publishQuestionsAfterTimeEnabled === true, "Time mode enabled");
+  assert(settingsR.data.settings.autoPublishQuestions === false, "Time mode: auto disabled");
+  assert(settingsR.data.settings.manualPublishQuestions === false, "Time mode: manual disabled");
+
+  const timedTag = `time-based-${Date.now()}`;
+  r = await req("POST", `/webhooks/${USER_ID}/faq`, {
+    question: timedTag,
+    customer: { email: "time-based@test.com" },
+  });
+  assert(r.data.status === "pending", "Time mode: initial status pending");
+
+  r = await req("GET", `/webhooks/${USER_ID}/faq?search=${encodeURIComponent(timedTag)}`);
+  const timedQuestion = (r.data.faqs || []).find((q) => q.question === timedTag);
+  assert(!!timedQuestion, "Time mode: question appears as published after retrieval");
+
+  // Reset to manual for subsequent tests
+  await req("PUT", "/settings", {
+    autoPublishQuestions: false,
+    manualPublishQuestions: true,
+    publishQuestionsAfterTimeEnabled: false,
   });
 }
 

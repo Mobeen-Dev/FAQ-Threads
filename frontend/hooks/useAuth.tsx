@@ -22,6 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const USER_CACHE_KEY = "auth_user_cache:v1";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -30,7 +31,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const cachedUserRaw = typeof window !== "undefined" ? localStorage.getItem(USER_CACHE_KEY) : null;
+    let cachedUser: User | null = null;
+    if (cachedUserRaw) {
+      try {
+        cachedUser = JSON.parse(cachedUserRaw) as User;
+      } catch {
+        cachedUser = null;
+      }
+    }
     if (!stored) {
+      setLoading(false);
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false && cachedUser) {
+      setUser(cachedUser);
+      setToken(stored);
       setLoading(false);
       return;
     }
@@ -43,10 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       setUser(data.user);
       setToken(stored);
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
     } catch {
-      localStorage.removeItem("token");
-      setUser(null);
-      setToken(null);
+      if (cachedUser) {
+        setUser(cachedUser);
+        setToken(stored);
+      } else {
+        localStorage.removeItem("token");
+        setUser(null);
+        setToken(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Login failed");
     localStorage.setItem("token", data.token);
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
   };
@@ -78,12 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Signup failed");
     localStorage.setItem("token", data.token);
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
     setToken(data.token);
     setUser(data.user);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem(USER_CACHE_KEY);
     setToken(null);
     setUser(null);
   };

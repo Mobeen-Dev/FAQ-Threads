@@ -1,10 +1,66 @@
 (function () {
-  if (window.__SHOPIFY_FAQ_WIDGET_BOOTED__) return;
-  window.__SHOPIFY_FAQ_WIDGET_BOOTED__ = true;
+  if (typeof window.__SHOPIFY_FAQ_WIDGET_BOOTSTRAP__ === "function") {
+    window.__SHOPIFY_FAQ_WIDGET_BOOTSTRAP__();
+    return;
+  }
 
   const CACHE_TTL_MS = 5 * 60 * 1000;
   const CACHE_KEY_PREFIX = "shopify-faq-widget:v1:";
   const memoryCache = new Map();
+
+  function getCookieValue(name) {
+    if (typeof document === "undefined" || !name) return "";
+    const escapedName = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function inferCustomerFromStorefrontGlobals() {
+    const st = window.__st || {};
+    const analyticsPage =
+      window.ShopifyAnalytics &&
+      window.ShopifyAnalytics.meta &&
+      window.ShopifyAnalytics.meta.page
+        ? window.ShopifyAnalytics.meta.page
+        : {};
+    const metaPage = window.meta && window.meta.page ? window.meta.page : {};
+    const shopifyCustomer = window.Shopify && window.Shopify.customer ? window.Shopify.customer : {};
+
+    const inferred = {
+      id: st.cid || analyticsPage.customerId || metaPage.customerId || shopifyCustomer.id || "",
+      email: st.email || shopifyCustomer.email || "",
+      name: shopifyCustomer.name || shopifyCustomer.firstName || "",
+      phone: shopifyCustomer.phone || "",
+      loggedIn: false,
+    };
+
+    const hasCustomerCookie = Boolean(getCookieValue("_secure_customer_sig"));
+    const hasCustomerSession = Boolean(getCookieValue("customer_account_session_created_at"));
+    inferred.loggedIn = Boolean(inferred.id || inferred.email || hasCustomerCookie || hasCustomerSession);
+
+    inferred.id = inferred.id ? String(inferred.id) : "";
+    inferred.email = inferred.email ? String(inferred.email) : "";
+    inferred.name = inferred.name ? String(inferred.name) : "";
+    inferred.phone = inferred.phone ? String(inferred.phone) : "";
+
+    return inferred;
+  }
+
+  function resolveCustomerContext(rawCustomer) {
+    const inferred = inferCustomerFromStorefrontGlobals();
+    const byLiquid = Boolean(rawCustomer && rawCustomer.loggedIn);
+    const byLiquidFields = Boolean(
+      rawCustomer && (rawCustomer.id || rawCustomer.email || rawCustomer.name || rawCustomer.phone)
+    );
+
+    return {
+      loggedIn: byLiquid || byLiquidFields || inferred.loggedIn,
+      id: (rawCustomer && rawCustomer.id) || inferred.id || "",
+      name: (rawCustomer && rawCustomer.name) || inferred.name || "",
+      email: (rawCustomer && rawCustomer.email) || inferred.email || "",
+      phone: (rawCustomer && rawCustomer.phone) || inferred.phone || "",
+    };
+  }
 
   function toInt(value, fallback) {
     const parsed = Number.parseInt(String(value), 10);
@@ -56,7 +112,7 @@
 
     if (config.sort) parsedUrl.searchParams.set("sort", config.sort);
 
-    // Future-compatible product filters (backend currently may ignore these).
+    // Product-aware filtering for storefront product pages.
     if (config.product.id) parsedUrl.searchParams.set("productId", config.product.id);
     if (config.product.handle) parsedUrl.searchParams.set("productHandle", config.product.handle);
 
@@ -122,14 +178,26 @@
   }
 
   async function requestJson(url, options) {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options && options.headers ? options.headers : {}),
-      },
-      credentials: "same-origin",
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options && options.headers ? options.headers : {}),
+        },
+        credentials: "same-origin",
+      });
+    } catch {
+      const mixedContentBlocked =
+        window.location.protocol === "https:" && /^http:\/\//i.test(String(url || ""));
+      if (mixedContentBlocked) {
+        throw new Error(
+          "Webhook URL is HTTP but this storefront is HTTPS. Use an HTTPS webhook URL."
+        );
+      }
+      throw new Error("Network error. Check that the webhook URL is reachable from your storefront.");
+    }
 
     let data = null;
     try {
@@ -352,9 +420,15 @@
       `;
     }
 
+    const identity = instance.config.customer.name || instance.config.customer.email || "";
+    const authCopy = identity
+      ? `You are signed in as ${escapeHtml(identity)}.`
+      : "You are signed in and can submit questions.";
+
     return `
       <section class="faq-widget__ask">
         <h3 class="faq-widget__ask-title">Ask a question</h3>
+        <p class="faq-widget__ask-copy">${authCopy}</p>
         <form class="faq-widget__form" data-form="submit-question">
           <label class="faq-widget__label" for="faq-question-input">Question</label>
           <textarea
@@ -754,6 +828,14 @@
   }
 
   function createInstance(root) {
+    const rawCustomer = {
+      loggedIn: String(root.dataset.customerLoggedIn || "") === "true",
+      id: root.dataset.customerId || "",
+      name: root.dataset.customerName || "",
+      email: root.dataset.customerEmail || "",
+      phone: root.dataset.customerPhone || "",
+    };
+
     const config = {
       root,
       webhookFaqUrl: normalizeFaqWebhookUrl(root.dataset.webhookUrl || ""),
@@ -763,13 +845,7 @@
         handle: root.dataset.productHandle || "",
         title: root.dataset.productTitle || "",
       },
-      customer: {
-        loggedIn: String(root.dataset.customerLoggedIn || "") === "true",
-        id: root.dataset.customerId || "",
-        name: root.dataset.customerName || "",
-        email: root.dataset.customerEmail || "",
-        phone: root.dataset.customerPhone || "",
-      },
+      customer: resolveCustomerContext(rawCustomer),
       loginUrl: root.dataset.loginUrl || "/account/login",
       title: root.dataset.title || "Product FAQs",
       subtitle: root.dataset.subtitle || "",
@@ -801,19 +877,95 @@
     };
   }
 
+  function isStaticShellRoot(root) {
+    return Boolean(root.querySelector(".faq-widget__shell")) && !Boolean(root.querySelector(".faq-widget__inner"));
+  }
+
   function bootstrap() {
     const roots = document.querySelectorAll('[data-faq-root="true"]');
     roots.forEach((root) => {
-      if (root.dataset.faqInitialized === "true") return;
-      root.dataset.faqInitialized = "true";
+      const existingInstance = root.__faqWidgetInstance;
+      if (existingInstance) {
+        if (isStaticShellRoot(root)) {
+          if (existingInstance.observer) {
+            existingInstance.observer.disconnect();
+            existingInstance.observer = null;
+          }
+          if (existingInstance.started) {
+            render(existingInstance);
+            if (existingInstance.config.webhookFaqUrl) {
+              void loadFaqs(existingInstance, { force: true });
+            }
+          } else {
+            startInstance(existingInstance);
+          }
+        }
+        return;
+      }
+
       const instance = createInstance(root);
+      root.__faqWidgetInstance = instance;
       setupLazyLoad(instance);
     });
   }
 
+  let bootstrapScheduled = false;
+  function scheduleBootstrap() {
+    if (bootstrapScheduled) return;
+    bootstrapScheduled = true;
+    const run = function () {
+      bootstrapScheduled = false;
+      bootstrap();
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(run);
+    } else {
+      window.setTimeout(run, 0);
+    }
+  }
+
+  function bindShopifyLifecycleHooks() {
+    if (window.__SHOPIFY_FAQ_WIDGET_EVENTS_BOUND__) return;
+    window.__SHOPIFY_FAQ_WIDGET_EVENTS_BOUND__ = true;
+
+    ["shopify:section:load", "shopify:section:select", "shopify:block:select", "shopify:section:reorder"].forEach(
+      (eventName) => {
+        document.addEventListener(eventName, scheduleBootstrap);
+      }
+    );
+  }
+
+  function observeWidgetRoots() {
+    if (window.__SHOPIFY_FAQ_WIDGET_OBSERVER__) return;
+    if (typeof MutationObserver !== "function") return;
+    const observer = new MutationObserver((mutations) => {
+      let shouldBootstrap = false;
+
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          if (node.matches('[data-faq-root="true"]') || node.querySelector('[data-faq-root="true"]')) {
+            shouldBootstrap = true;
+            break;
+          }
+        }
+        if (shouldBootstrap) break;
+      }
+
+      if (shouldBootstrap) scheduleBootstrap();
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    window.__SHOPIFY_FAQ_WIDGET_OBSERVER__ = observer;
+  }
+
+  window.__SHOPIFY_FAQ_WIDGET_BOOTSTRAP__ = scheduleBootstrap;
+  bindShopifyLifecycleHooks();
+  observeWidgetRoots();
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
+    document.addEventListener("DOMContentLoaded", scheduleBootstrap, { once: true });
   } else {
-    bootstrap();
+    scheduleBootstrap();
   }
 })();

@@ -46,6 +46,9 @@ router.post("/:userId/faq", async (req, res) => {
         answer: payload.answer || "",
         status,
         source: "webhook",
+        productId: payload.productId ? String(payload.productId) : null,
+        productHandle: payload.productHandle ? String(payload.productHandle) : null,
+        productTitle: payload.productTitle ? String(payload.productTitle) : null,
         customerName: customer.name || payload.customerName || null,
         customerEmail,
         customerPhone: customer.phone || payload.customerPhone || null,
@@ -182,6 +185,9 @@ router.put("/:userId/faq", async (req, res) => {
     if (payload.question) updateData.question = payload.question;
     if (payload.answer !== undefined) updateData.answer = payload.answer;
     if (payload.status) updateData.status = payload.status;
+    if (payload.productId !== undefined) updateData.productId = payload.productId ? String(payload.productId) : null;
+    if (payload.productHandle !== undefined) updateData.productHandle = payload.productHandle ? String(payload.productHandle) : null;
+    if (payload.productTitle !== undefined) updateData.productTitle = payload.productTitle ? String(payload.productTitle) : null;
     if (customer.name || payload.customerName) updateData.customerName = customer.name || payload.customerName;
     if (customer.email || payload.customerEmail) updateData.customerEmail = customer.email || payload.customerEmail;
     if (customer.phone || payload.customerPhone) updateData.customerPhone = customer.phone || payload.customerPhone;
@@ -207,12 +213,21 @@ router.put("/:userId/faq", async (req, res) => {
 router.get("/:userId/faq", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { categorySlug, search, sort = "votes" } = req.query;
+    const { categorySlug, search, sort = "votes", productId, productHandle } = req.query;
 
     const shop = await prisma.shop.findFirst({ where: { userId } });
     if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    await settingsService.applyTimeBasedPublishing(shop.id);
 
     const where = { shopId: shop.id, status: "published" };
+
+    // Product-scoped filtering for storefront pages.
+    // If productId is provided, it takes priority over productHandle.
+    if (productId) {
+      where.productId = String(productId);
+    } else if (productHandle) {
+      where.productHandle = String(productHandle);
+    }
 
     if (categorySlug) {
       const category = await prisma.category.findFirst({ where: { shopId: shop.id, slug: categorySlug } });
