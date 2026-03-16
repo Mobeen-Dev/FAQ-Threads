@@ -32,6 +32,17 @@ jobs:
               exit 1
             fi
           done
+
+          FRONTEND_URL="${FRONTEND_URL%/}"
+          BACKEND_URL="${BACKEND_URL%/}"
+          NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL%/}"
+          if [[ "$NEXT_PUBLIC_API_URL" != */api ]]; then
+            NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}/api"
+          fi
+          if [ -z "$ALLOWED_ORIGINS" ]; then
+            ALLOWED_ORIGINS="$FRONTEND_URL"
+          fi
+
           cat > deploy/.env.production <<EOF
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { resolveApiBase } from "@/services/apiBase";
 
 interface User {
   id: string;
@@ -21,7 +22,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4004/api";
+const API_BASE = resolveApiBase();
 const USER_CACHE_KEY = "auth_user_cache:v1";
 
 export function AuthProvider({ children }: { children: ReactNode }) {

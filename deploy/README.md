@@ -36,6 +36,10 @@ PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
    - `NEXT_PUBLIC_API_URL`
    - `JWT_SECRET`
    - `ALLOWED_ORIGINS` (optional)
+
+If `NEXT_PUBLIC_API_URL` is provided without `/api`, the workflow appends `/api` automatically.
+If `ALLOWED_ORIGINS` is empty, it defaults to `FRONTEND_URL`.
+Set `FRONTEND_URL` to the exact browser origin (example: `http://92.222.229.140:3004`) so CORS preflight succeeds.
 4. Keep `deploy/.env.production.example` as the reference template.
 
 ## Branch strategy
