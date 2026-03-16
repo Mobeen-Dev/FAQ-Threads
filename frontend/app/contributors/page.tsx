@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type StoreContributor } from "@/services/shopifyApi";
+import MaterialIcon from "@/components/MaterialIcon";
 
 const statusBadge: Record<string, string> = {
   active: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300",
@@ -68,7 +69,7 @@ export default function ContributorsPage() {
 
       {contributors.length === 0 ? (
         <div className="text-center py-16 text-stone-500 dark:text-zinc-400">
-          <div className="text-4xl mb-3">👥</div>
+          <MaterialIcon name="group" className="text-4xl mb-3 block" />
           <p className="text-lg font-medium">No contributors yet</p>
           <p className="text-sm mt-1">Contributors are created when customers submit questions via webhooks.</p>
         </div>
@@ -89,16 +90,16 @@ export default function ContributorsPage() {
                   </p>
                   {c.trusted && (
                     <span className="text-xs px-2 py-0.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 font-medium">
-                      ⭐ Trusted
+                      Trusted
                     </span>
                   )}
                 </div>
                 <p className="text-sm text-stone-500 dark:text-zinc-400 truncate">{c.email}</p>
                 {c.phone && <p className="text-xs text-stone-400 dark:text-zinc-500">{c.phone}</p>}
                 <div className="flex gap-3 mt-1 text-xs text-stone-400 dark:text-zinc-500">
-                  <span>❓ {c._count?.questions ?? 0} questions</span>
-                  <span>💬 {c._count?.answers ?? 0} answers</span>
-                  <span>👍 {c._count?.votes ?? 0} votes</span>
+                  <span>{c._count?.questions ?? 0} questions</span>
+                  <span>{c._count?.answers ?? 0} answers</span>
+                  <span>{c._count?.votes ?? 0} votes</span>
                 </div>
               </div>
 
@@ -132,7 +133,7 @@ export default function ContributorsPage() {
                       : "border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                   }`}
                 >
-                  {c.trusted ? "Untrust" : "⭐ Trust"}
+                  {c.trusted ? "Untrust" : "Trust"}
                 </button>
               </div>
             </div>

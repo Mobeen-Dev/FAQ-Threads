@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { useTheme } from "@/hooks/useTheme";
 import Sidebar from "@/components/Sidebar";
+import MaterialIcon from "@/components/MaterialIcon";
 import { useEffect } from "react";
 import Link from "next/link";
 
@@ -48,12 +49,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <div className="lg:hidden sticky top-0 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur border-b border-stone-200 dark:border-zinc-800">
           <div className="px-3 py-2 flex items-center gap-2 overflow-x-auto">
             {[
-              { href: "/dashboard", label: "📊" },
-              { href: "/questions", label: "❓" },
-              { href: "/answers", label: "💬" },
-              { href: "/contributors", label: "👥" },
-              { href: "/analytics", label: "📈" },
-              { href: "/settings", label: "⚙️" },
+              { href: "/dashboard", icon: "dashboard" },
+              { href: "/questions", icon: "help" },
+              { href: "/answers", icon: "chat" },
+              { href: "/contributors", icon: "group" },
+              { href: "/analytics", icon: "monitoring" },
+              { href: "/settings", icon: "settings" },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -64,7 +65,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                     : "bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
                 }`}
               >
-                {item.label}
+                <MaterialIcon name={item.icon} className="text-[1.2rem]" />
               </Link>
             ))}
             <button
@@ -72,14 +73,14 @@ function AppContent({ children }: { children: React.ReactNode }) {
               className="shrink-0 w-10 h-10 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
               aria-label="Toggle theme"
             >
-              {theme === "dark" ? "☀️" : "🌙"}
+              <MaterialIcon name={theme === "dark" ? "light_mode" : "dark_mode"} className="text-[1.2rem]" />
             </button>
             <button
               onClick={logout}
               className="shrink-0 w-10 h-10 rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300"
               aria-label="Sign out"
             >
-              🚪
+              <MaterialIcon name="logout" className="text-[1.2rem]" />
             </button>
           </div>
         </div>

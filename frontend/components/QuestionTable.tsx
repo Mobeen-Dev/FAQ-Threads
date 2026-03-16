@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import MaterialIcon from "@/components/MaterialIcon";
 
 interface Question {
   id: string;
@@ -83,13 +84,15 @@ function ActionMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
             onClick={() => { onEdit(); setOpen(false); }}
             className="w-full text-left px-4 py-2.5 text-sm text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-700 flex items-center gap-2.5 transition-colors"
           >
-            ✏️ Edit
+            <MaterialIcon name="edit" className="text-base" />
+            Edit
           </button>
           <button
             onClick={() => { onDelete(); setOpen(false); }}
             className="w-full text-left px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 flex items-center gap-2.5 transition-colors"
           >
-            🗑️ Delete
+            <MaterialIcon name="delete" className="text-base" />
+            Delete
           </button>
         </div>
       )}
@@ -101,7 +104,7 @@ export default function QuestionTable({ questions, onOpen, onEdit, onDelete, onS
   if (questions.length === 0) {
     return (
       <div className="text-center py-16 text-stone-500 dark:text-zinc-400">
-        <div className="text-4xl mb-3">📝</div>
+        <MaterialIcon name="edit_note" className="text-4xl mb-3 block" />
         <p className="text-lg font-medium">No questions yet</p>
         <p className="text-sm mt-1">Create your first FAQ question to get started.</p>
       </div>
@@ -152,10 +155,13 @@ export default function QuestionTable({ questions, onOpen, onEdit, onDelete, onS
                   )}
                   {q.contributor?.trusted && (
                     <span className="text-xs px-2 py-0.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 font-medium">
-                      ⭐ Trusted
+                      Trusted
                     </span>
                   )}
-                  <span className="text-xs text-stone-400 dark:text-zinc-500">👁 {q.views}</span>
+                  <span className="text-xs text-stone-400 dark:text-zinc-500 inline-flex items-center gap-1">
+                    <MaterialIcon name="visibility" className="text-sm" />
+                    {q.views}
+                  </span>
                   {answerCount > 0 && (
                     <button
                       onClick={(e) => {
@@ -163,9 +169,10 @@ export default function QuestionTable({ questions, onOpen, onEdit, onDelete, onS
                         onViewAnswers?.(q.id);
                       }}
                       aria-label={`View answers for question ${q.question}`}
-                      className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
+                      className="text-xs text-teal-600 dark:text-teal-400 hover:underline inline-flex items-center gap-1"
                     >
-                      💬 {answerCount} {answerCount === 1 ? "answer" : "answers"}
+                      <MaterialIcon name="chat" className="text-sm" />
+                      {answerCount} {answerCount === 1 ? "answer" : "answers"}
                     </button>
                   )}
                   {q.contributor && (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type Settings } from "@/services/shopifyApi";
+import MaterialIcon from "@/components/MaterialIcon";
 
 type PublishingMode = "manual" | "auto" | "time";
 
@@ -117,6 +118,10 @@ const DEFAULTS: Settings = {
   trustedCustomerAutoPublish: false,
 };
 
+function serializeSettings(settings: Settings) {
+  return JSON.stringify(settings);
+}
+
 function getQuestionMode(settings: Settings): PublishingMode {
   if (settings.autoPublishQuestions) return "auto";
   if (settings.publishQuestionsAfterTimeEnabled) return "time";
@@ -136,13 +141,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [baselineSerialized, setBaselineSerialized] = useState(serializeSettings(DEFAULTS));
 
   const loadSettings = useCallback(async () => {
     try {
       const { settings: data } = await shopifyApi.getSettings();
-      setSettings({ ...DEFAULTS, ...data });
+      const merged = { ...DEFAULTS, ...data };
+      setSettings(merged);
+      setBaselineSerialized(serializeSettings(merged));
     } catch {
-      // Use defaults
+      setBaselineSerialized(serializeSettings(DEFAULTS));
     } finally {
       setLoading(false);
     }
@@ -158,7 +166,9 @@ export default function SettingsPage() {
     setError("");
     try {
       const { settings: data } = await shopifyApi.updateSettings(settings);
-      setSettings({ ...DEFAULTS, ...data });
+      const merged = { ...DEFAULTS, ...data };
+      setSettings(merged);
+      setBaselineSerialized(serializeSettings(merged));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -192,6 +202,7 @@ export default function SettingsPage() {
 
   const questionMode = getQuestionMode(settings);
   const answerMode = getAnswerMode(settings);
+  const isDirty = serializeSettings(settings) !== baselineSerialized;
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" /></div>;
@@ -203,21 +214,26 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-stone-900 dark:text-zinc-100">Settings</h1>
         <button
           onClick={handleSave}
-          disabled={saving}
-          className="bg-teal-600 text-white px-5 py-2.5 rounded-xl hover:bg-teal-700 disabled:opacity-50 transition-colors font-medium"
+          disabled={saving || !isDirty}
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-xl hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           {saving ? "Saving..." : "Save Settings"}
         </button>
       </div>
+      {!isDirty && !saved && (
+        <p className="text-sm text-stone-500 dark:text-zinc-400 mb-4">No unsaved changes.</p>
+      )}
 
       {saved && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-xl mb-6">
-          ✅ Settings saved successfully!
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-xl mb-6 inline-flex items-center gap-2">
+          <MaterialIcon name="check_circle" className="text-base" />
+          Settings saved successfully!
         </div>
       )}
       {error && (
-        <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl mb-6">
-          ❌ {error}
+        <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl mb-6 inline-flex items-center gap-2">
+          <MaterialIcon name="error" className="text-base" />
+          {error}
         </div>
       )}
 

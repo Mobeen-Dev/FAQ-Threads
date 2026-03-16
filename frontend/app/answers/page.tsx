@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useFetch } from "@/hooks/useFetch";
 import { shopifyApi, type Answer } from "@/services/shopifyApi";
+import MaterialIcon from "@/components/MaterialIcon";
 
 const statusClasses: Record<string, string> = {
   published: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
@@ -137,7 +138,7 @@ export default function AnswersPage() {
           </div>
         ) : answers.length === 0 ? (
           <div className="text-center py-16 text-stone-500 dark:text-zinc-400">
-            <div className="text-4xl mb-3">💬</div>
+            <MaterialIcon name="chat_bubble" className="text-4xl mb-3 block" />
             <p className="text-lg font-medium">No answers found</p>
             <p className="text-sm mt-1">Adjust filters or wait for customer contributions.</p>
           </div>
@@ -213,7 +214,7 @@ export default function AnswersPage() {
                 aria-label="Close edit answer dialog"
                 className="w-9 h-9 rounded-xl hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-500 dark:text-zinc-400"
               >
-                ✕
+                <MaterialIcon name="close" className="text-[1.1rem]" />
               </button>
             </div>
             <textarea

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MaterialIcon from "@/components/MaterialIcon";
 
 interface StatCardProps {
   title: string;
@@ -17,7 +18,7 @@ export default function StatCard({ title, value, icon, color = "bg-teal-500", hr
           <p className="text-3xl font-bold mt-1 text-stone-900 dark:text-zinc-100">{value}</p>
         </div>
         <div className={`${color} text-white p-3 rounded-xl text-2xl`}>
-          {icon}
+          <MaterialIcon name={icon} className="text-[1.5rem]" />
         </div>
       </div>
     </div>

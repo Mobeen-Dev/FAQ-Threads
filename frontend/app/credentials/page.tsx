@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type ShopCredentials } from "@/services/shopifyApi";
 import { useRouter } from "next/navigation";
+import MaterialIcon from "@/components/MaterialIcon";
 
 export default function CredentialsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -82,7 +83,10 @@ export default function CredentialsPage() {
       {/* Webhook URL Card */}
       {webhookUrl && (
         <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-2xl p-6 mb-6">
-          <h2 className="text-lg font-semibold text-teal-900 dark:text-teal-100 mb-2">📡 Your Webhook URL</h2>
+          <h2 className="text-lg font-semibold text-teal-900 dark:text-teal-100 mb-2 inline-flex items-center gap-2">
+            <MaterialIcon name="rss_feed" className="text-lg" />
+            Your Webhook URL
+          </h2>
           <p className="text-sm text-teal-700 dark:text-teal-300 mb-3">
             Paste this URL in your Shopify app or Chrome extension. It accepts POST and PUT requests.
           </p>
@@ -94,14 +98,19 @@ export default function CredentialsPage() {
               onClick={copyWebhookUrl}
               className="bg-teal-600 text-white px-4 py-2.5 rounded-xl hover:bg-teal-700 transition-colors text-sm whitespace-nowrap font-medium"
             >
-              {copied ? "✅ Copied!" : "📋 Copy"}
+              {copied ? "Copied!" : "Copy"}
             </button>
           </div>
         </div>
       )}
 
       {error && <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 px-4 py-3 rounded-xl mb-6">{error}</div>}
-      {success && <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-xl mb-6">✅ {success}</div>}
+      {success && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-xl mb-6 inline-flex items-center gap-2">
+          <MaterialIcon name="check_circle" className="text-base" />
+          {success}
+        </div>
+      )}
 
       {/* Credentials Form */}
       <form onSubmit={handleSave} autoComplete="off" className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800 p-6">

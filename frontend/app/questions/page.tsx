@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm from "@/components/QuestionForm";
 import QuestionTable from "@/components/QuestionTable";
+import MaterialIcon from "@/components/MaterialIcon";
 import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type PaginatedResponse, type Question, type Category } from "@/services/shopifyApi";
@@ -184,7 +185,7 @@ export default function QuestionsPage() {
           onClick={openNewForm}
           className="bg-teal-600 text-white px-4 py-2.5 rounded-xl hover:bg-teal-700 transition-colors font-medium"
         >
-          + Add Question
+          Add Question
         </button>
       </div>
 
@@ -284,7 +285,7 @@ export default function QuestionsPage() {
                     aria-label="Close question details dialog"
                     className="w-9 h-9 rounded-xl hover:bg-stone-100 dark:hover:bg-zinc-800 text-stone-500 dark:text-zinc-400"
                   >
-                    ✕
+                    <MaterialIcon name="close" className="text-[1.1rem]" />
                   </button>
                 </div>
 
@@ -307,10 +308,16 @@ export default function QuestionsPage() {
                       <option value="suspended">Suspended</option>
                     </select>
                     <span className="px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300">
-                      👁 {openQuestion.views} views
+                      <span className="inline-flex items-center gap-1">
+                        <MaterialIcon name="visibility" className="text-sm" />
+                        {openQuestion.views} views
+                      </span>
                     </span>
                     <span className="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
-                      💬 {openQuestion._count?.answers ?? 0} answers
+                      <span className="inline-flex items-center gap-1">
+                        <MaterialIcon name="chat" className="text-sm" />
+                        {openQuestion._count?.answers ?? 0} answers
+                      </span>
                     </span>
                     {openQuestion.category?.name && (
                       <span className="px-2.5 py-1 rounded-lg bg-stone-100 dark:bg-zinc-800 text-stone-700 dark:text-zinc-300">

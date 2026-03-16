@@ -49,17 +49,17 @@ export default function AnalyticsPage() {
 
       {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Total FAQs" value={s.totalQuestions} icon="📋" color="bg-teal-500" />
-        <StatCard title="Published" value={s.published} icon="✅" color="bg-emerald-500" />
-        <StatCard title="Publish Rate" value={`${publishRate}%`} icon="📊" color="bg-violet-500" />
-        <StatCard title="Categories" value={s.categories} icon="📁" color="bg-sky-500" />
+        <StatCard title="Total FAQs" value={s.totalQuestions} icon="checklist" color="bg-teal-500" />
+        <StatCard title="Published" value={s.published} icon="check_circle" color="bg-emerald-500" />
+        <StatCard title="Publish Rate" value={`${publishRate}%`} icon="query_stats" color="bg-violet-500" />
+        <StatCard title="Categories" value={s.categories} icon="category" color="bg-sky-500" />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Total Answers" value={s.totalAnswers} icon="💬" color="bg-sky-500" />
-        <StatCard title="Published Answers" value={s.publishedAnswers} icon="📢" color="bg-emerald-500" />
-        <StatCard title="Contributors" value={s.totalContributors} icon="👥" color="bg-teal-500" />
-        <StatCard title="Trusted" value={s.trustedContributors} icon="⭐" color="bg-violet-500" />
+        <StatCard title="Total Answers" value={s.totalAnswers} icon="chat" color="bg-sky-500" />
+        <StatCard title="Published Answers" value={s.publishedAnswers} icon="campaign" color="bg-emerald-500" />
+        <StatCard title="Contributors" value={s.totalContributors} icon="group" color="bg-teal-500" />
+        <StatCard title="Trusted" value={s.trustedContributors} icon="verified" color="bg-violet-500" />
       </div>
 
       {/* Breakdown */}
