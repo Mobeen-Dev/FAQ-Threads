@@ -44,129 +44,49 @@ jobs:
           EOF
           echo "✅ deploy/.env.production generated from secrets"
 
-      - name: 🗄️ Backup Database (best effort)
-        env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      - name: 🛑 Stop existing services
         run: |
-          set +e
-          mkdir -p deploy/backups
-          CONTAINER_ID=$(docker compose -f deploy/docker-compose.deploy.yml ps -q postgres)
-          if [ -n "$CONTAINER_ID" ]; then
-            BACKUP_PATH="deploy/backups/predeploy-$(date +%Y%m%d-%H%M%S).sql"
-            docker exec "$CONTAINER_ID" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > "$BACKUP_PATH"
-            if [ -s "$BACKUP_PATH" ]; then
-              echo "✅ DB backup created: $BACKUP_PATH"
-            else
-              echo "⚠️ DB backup file was empty"
-            fi
-          else
-            echo "ℹ️ No running postgres container found; skipping DB backup"
-          fi
+          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml down --remove-orphans || true
 
-      - name: 🛑 Stop Current Services
+      - name: 🏗️ Build and start services
         run: |
-          echo "Stopping current services..."
-          docker compose -f deploy/docker-compose.deploy.yml down --remove-orphans || true
+          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
 
-      - name: 💾 Backup current app images
+      - name: ⏱️ Wait for startup
         run: |
-          for image in faq-app-backend faq-app-frontend; do
-            if docker image inspect "${image}:latest" > /dev/null 2>&1; then
-              docker tag "${image}:latest" "${image}:backup"
-              echo "Backed up ${image}:latest -> ${image}:backup"
-            fi
-          done
-
-      - name: 🧹 Clean Up Old Images (Optional)
-        run: |
-          echo "Cleaning up old images..."
-          docker image prune -f || true
-
-      - name: 🏗️ Build and Start Services
-        run: |
-          echo "Building and starting services..."
-          docker compose -f deploy/docker-compose.deploy.yml up -d --build --remove-orphans
-
-      - name: ⏱️ Wait for Services to Start
-        run: |
-          echo "Waiting for services to initialize..."
           sleep 20
-
-      - name: 🐘 Check PostgreSQL Health
-        run: |
-          echo "Checking PostgreSQL health..."
-          CONTAINER_ID=$(docker compose -f deploy/docker-compose.deploy.yml ps -q postgres)
-          if [ -z "$CONTAINER_ID" ]; then
-            echo "❌ PostgreSQL container not found"
-            exit 1
-          fi
-          for i in {1..12}; do
-            STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$CONTAINER_ID")
-            if [ "$STATUS" = "healthy" ]; then
-              echo "✅ PostgreSQL is healthy!"
-              exit 0
-            fi
-            echo "Attempt $i/12: PostgreSQL status=$STATUS, waiting 10s..."
-            sleep 10
-          done
-          echo "❌ PostgreSQL health check failed!"
-          exit 1
 
       - name: 🏥 Check Backend Health
         run: |
-          echo "Checking backend health..."
-          for i in {1..12}; do
+          for i in {1..15}; do
             if curl -fsS http://localhost:4004/health > /dev/null; then
               echo "✅ Backend is healthy!"
               exit 0
             fi
-            echo "Attempt $i/12: Backend not ready, waiting 10s..."
-            sleep 10
+            echo "Attempt $i/15: Backend not ready, waiting 5s..."
+            sleep 5
           done
           echo "❌ Backend health check failed!"
           exit 1
 
       - name: 🌐 Check Frontend Health
         run: |
-          echo "Checking frontend health..."
-          for i in {1..12}; do
+          for i in {1..15}; do
             if curl -fsS http://localhost:3004/login > /dev/null; then
               echo "✅ Frontend is healthy!"
               exit 0
             fi
-            echo "Attempt $i/12: Frontend not ready, waiting 10s..."
-            sleep 10
+            echo "Attempt $i/15: Frontend not ready, waiting 5s..."
+            sleep 5
           done
           echo "❌ Frontend health check failed!"
           exit 1
 
-      - name: ✅ Deployment Success
+      - name: ✅ Deployment status
         run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "Frontend: http://localhost:3004"
-          echo "Backend:  http://localhost:4004/health"
-          docker compose -f deploy/docker-compose.deploy.yml ps
+          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
 
-      - name: 🚨 Rollback on Failure
+      - name: 📋 Dump logs on failure
         if: failure()
         run: |
-          echo "💥 Deployment failed! Attempting rollback..."
-          docker compose -f deploy/docker-compose.deploy.yml down || true
-          if docker image inspect faq-app-backend:backup > /dev/null 2>&1 && docker image inspect faq-app-frontend:backup > /dev/null 2>&1; then
-            docker tag faq-app-backend:backup faq-app-backend:latest
-            docker tag faq-app-frontend:backup faq-app-frontend:latest
-            docker compose -f deploy/docker-compose.deploy.yml up -d --no-build --remove-orphans
-            sleep 20
-            if curl -fsS http://localhost:4004/health > /dev/null; then
-              echo "✅ Rollback successful!"
-              echo "⚠️ Note: container rollback does not automatically restore database state."
-              echo "Use SQL dump from deploy/backups/ if data rollback is needed."
-            else
-              echo "❌ Rollback failed!"
-              exit 1
-            fi
-          else
-            echo "No backup images available, rollback skipped."
-            exit 1
-          fi
+          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml logs --tail=200 || true

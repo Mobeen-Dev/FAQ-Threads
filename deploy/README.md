@@ -15,16 +15,13 @@ This project now supports CI/CD with GitHub Actions and a deploy pipeline on a *
 When code is pushed to `deploy`:
 
 1. Generates `deploy/.env.production` from GitHub Secrets.
-2. Tries to create a pre-deploy PostgreSQL SQL dump under `deploy/backups/`.
-3. Stops existing containers for `deploy/docker-compose.deploy.yml`.
-4. Backs up current app images (`faq-app-backend:backup`, `faq-app-frontend:backup`).
-5. Builds and starts updated services with Docker Compose.
-6. Runs health checks for PostgreSQL, backend (`/health`), and frontend (`/login`).
-7. On failure, attempts rollback from backup images.
+2. Stops existing containers for `deploy/docker-compose.deploy.yml`.
+3. Runs:
+   - `sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
+4. Checks backend (`/health`) and frontend (`/login`) locally.
+5. Prints compose logs on failure.
 
 PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
-
-> Rollback restores container images only. Database state is not auto-restored; use the SQL backup file if needed.
 
 ## Server setup steps (one-time)
 
