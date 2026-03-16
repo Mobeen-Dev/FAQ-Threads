@@ -21,7 +21,7 @@ function toHost(value) {
 }
 
 function getConfiguredOrigins() {
-  const configured = parseOriginValues([process.env.FRONTEND_URL || "http://localhost:3000", process.env.ALLOWED_ORIGINS]);
+  const configured = parseOriginValues([process.env.FRONTEND_URL || "http://localhost:3004", process.env.ALLOWED_ORIGINS]);
   return new Set(configured.map(toOrigin).filter(Boolean));
 }
 

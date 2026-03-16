@@ -385,7 +385,7 @@ npm run dev
 node tests/webhook-test.js
 
 # Or with a custom URL
-node tests/webhook-test.js http://localhost:4000
+node tests/webhook-test.js http://localhost:4004
 ```
 
 The test script performs 19 test sections covering:

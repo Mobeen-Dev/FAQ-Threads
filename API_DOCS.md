@@ -1,7 +1,7 @@
 # FAQ App — Complete API Documentation
 
 > **Version:** 1.0.0  
-> **Base URL:** `http://localhost:4000`  
+> **Base URL:** `http://localhost:4004`  
 > **Content-Type:** `application/json` (all requests and responses)
 
 ---
@@ -40,7 +40,7 @@ This is a multi-tenant FAQ management system. Each **User** (shop owner) signs u
 ┌─────────────────────┐         ┌──────────────────┐        ┌────────────────┐
 │  Ecommerce Frontend │  HTTP   │   FAQ Backend    │        │   PostgreSQL   │
 │  (Your Plugin)      │ ──────► │   Express.js     │ ◄────► │   + Prisma ORM │
-│                     │         │   Port 4000      │        │                │
+│                     │         │   Port 4004      │        │                │
 └─────────────────────┘         └──────────────────┘        └────────────────┘
         │                              ▲
         │  Public Webhook URLs         │  JWT Auth
@@ -1426,7 +1426,7 @@ The backend uses dynamic CORS:
 Example backend env:
 
 ```env
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3004
 ALLOWED_ORIGINS=https://admin.example.com,https://staging-admin.example.com
 ```
 

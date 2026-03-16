@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4004/api";
 const CACHE_PREFIX = "faq-api-cache:v1:";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 

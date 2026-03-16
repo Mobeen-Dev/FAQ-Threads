@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const API_KEY = process.env.SHOPIFY_API_KEY;
 const API_SECRET = process.env.SHOPIFY_API_SECRET;
 const SCOPES = process.env.SHOPIFY_SCOPES || "read_products,write_products";
-const REDIRECT_URI = process.env.SHOPIFY_REDIRECT_URI || "http://localhost:4000/api/auth/callback";
+const REDIRECT_URI = process.env.SHOPIFY_REDIRECT_URI || "http://localhost:4004/api/auth/callback";
 
 function buildAuthUrl(shop) {
   const nonce = crypto.randomBytes(16).toString("hex");

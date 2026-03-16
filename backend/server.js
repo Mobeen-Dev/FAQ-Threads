@@ -18,7 +18,7 @@ const { createRateLimiter } = require("./middleware/rateLimit");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4004;
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {

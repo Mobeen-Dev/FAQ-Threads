@@ -21,7 +21,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4004/api";
 const USER_CACHE_KEY = "auth_user_cache:v1";
 
 export function AuthProvider({ children }: { children: ReactNode }) {

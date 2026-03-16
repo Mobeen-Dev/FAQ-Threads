@@ -22,6 +22,8 @@ When code is pushed to `deploy`:
 6. Runs health checks for PostgreSQL, backend (`/health`), and frontend (`/login`).
 7. On failure, attempts rollback from backup images.
 
+PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
+
 > Rollback restores container images only. Database state is not auto-restored; use the SQL backup file if needed.
 
 ## Server setup steps (one-time)

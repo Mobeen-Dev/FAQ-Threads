@@ -71,10 +71,10 @@ npx prisma generate
 ### 4. Run both servers
 
 ```bash
-# Terminal 1 — Backend (port 4000)
+# Terminal 1 — Backend (port 4004)
 cd backend && npm run dev
 
-# Terminal 2 — Frontend (port 3000)
+# Terminal 2 — Frontend (port 3004)
 cd frontend && npm run dev
 ```
 

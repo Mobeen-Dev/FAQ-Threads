@@ -11,6 +11,6 @@ COPY . .
 
 RUN npx prisma generate
 
-EXPOSE 4000
+EXPOSE 4004
 
 CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push && node server.js"]

@@ -48,7 +48,7 @@ function resolvePublicBaseUrl(req) {
     return requestBase;
   }
 
-  return configuredBase || "http://localhost:4000";
+  return configuredBase || "http://localhost:4004";
 }
 
 function buildWebhookUrl(req, identifier) {

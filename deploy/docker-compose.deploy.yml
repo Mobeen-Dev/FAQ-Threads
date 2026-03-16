@@ -13,6 +13,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    ports:
+      - "5434:5432"
     networks:
       - app_net
 
@@ -26,7 +28,7 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
-      PORT: 4000
+      PORT: 4004
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
@@ -36,7 +38,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "4000:4000"
+      - "4004:4004"
     networks:
       - app_net
 
@@ -54,7 +56,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "3004:3000"
     networks:
       - app_net
 

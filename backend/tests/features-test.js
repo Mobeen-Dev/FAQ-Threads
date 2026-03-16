@@ -5,7 +5,7 @@
  * Usage: node tests/features-test.js
  */
 
-const BASE = "http://localhost:4000/api";
+const BASE = "http://localhost:4004/api";
 let TOKEN = "";
 let SHOP_ID = "";
 let USER_ID = "";

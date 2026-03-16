@@ -8,7 +8,7 @@
  *  Tests the full lifecycle: signup → credentials → webhook POST/PUT/GET.
  *
  *  Usage:
- *    node tests/webhook-test.js                    # default: http://localhost:4000
+ *    node tests/webhook-test.js                    # default: http://localhost:4004
  *    node tests/webhook-test.js http://myhost:5000 # custom base URL
  *
  *  Prerequisites:
@@ -23,7 +23,7 @@ const https = require("https");
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const BASE_URL = process.argv[2] || "http://localhost:4000";
+const BASE_URL = process.argv[2] || "http://localhost:4004";
 const parsed = new URL(BASE_URL);
 const IS_HTTPS = parsed.protocol === "https:";
 const HOST = parsed.hostname;

@@ -29,7 +29,7 @@ Merchants will copy the following webhook URL from the app admin panel and paste
 📡 Your Webhook URL
 Paste this URL in your Shopify app or Chrome extension. It accepts POST and PUT requests.
 
-http://localhost:4000/api/webhooks/cmmous8m700006oio7in04wzr/faq
+http://localhost:4004/api/webhooks/cmmous8m700006oio7in04wzr/faq
 ```
 
 The theme extension must **read and display data provided through this API**.
