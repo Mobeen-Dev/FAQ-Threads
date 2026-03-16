@@ -14,10 +14,18 @@ const answerRoutes = require("./routes/answers");
 const voteRoutes = require("./routes/votes");
 const contributorRoutes = require("./routes/contributors");
 const { resolveCorsOptions } = require("./services/corsService");
+const { createRateLimiter } = require("./middleware/rateLimit");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET. Set JWT_SECRET in backend/.env before starting the server.");
+}
+
+app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(
@@ -28,15 +36,32 @@ app.use(
   })
 );
 app.use(morgan("dev"));
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
+
+const authRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  message: "Too many authentication attempts. Please try again in a few minutes.",
+});
+
+const webhookWriteRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: "Webhook rate limit exceeded. Please slow down.",
+});
 
 // Health check
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 // Routes
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRateLimiter, authRoutes);
 app.use("/api/credentials", credentialRoutes);
-app.use("/api/webhooks", webhookRoutes);
+app.use("/api/webhooks", (req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return webhookWriteRateLimiter(req, res, next);
+  }
+  return next();
+}, webhookRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/answers", answerRoutes);

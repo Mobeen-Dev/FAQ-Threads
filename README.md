@@ -99,3 +99,15 @@ cd frontend && npm run dev
 | POST   | `/api/questions/:id/moderate`   | Approve/reject        |
 | GET    | `/api/questions/categories`     | List categories       |
 | POST   | `/api/questions/categories`     | Create category       |
+
+## CI/CD and deployment
+
+GitHub Actions workflows are configured for CI and deploy-branch CD:
+
+- CI + build checks on `main` and `deploy`
+- Automatic server deployment on pushes to `deploy`
+
+See deployment setup:
+
+- `deploy/README.md`
+- `.github/workflows/ci-cd.yml`

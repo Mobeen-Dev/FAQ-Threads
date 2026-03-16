@@ -1,7 +1,11 @@
 const prisma = require("../services/prismaClient");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET. Set JWT_SECRET in backend/.env");
+}
 
 async function authMiddleware(req, res, next) {
   try {

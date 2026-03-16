@@ -1,4 +1,5 @@
 const prisma = require("./prismaClient");
+const settingsService = require("./settingsService");
 
 // ---------- Categories ----------
 
@@ -24,6 +25,7 @@ async function createCategory(shopId, data) {
 
 async function getQuestions(shopId, filters = {}) {
   const { categoryId, status, search, page = 1, limit = 20, sort = "sortOrder" } = filters;
+  await settingsService.applyTimeBasedPublishing(shopId);
 
   const where = { shopId };
   if (categoryId) where.categoryId = categoryId;
@@ -59,6 +61,7 @@ async function getQuestions(shopId, filters = {}) {
 }
 
 async function getQuestion(shopId, id) {
+  await settingsService.applyTimeBasedPublishing(shopId);
   return prisma.question.findFirst({
     where: { id, shopId },
     include: {
@@ -124,16 +127,23 @@ async function deleteQuestion(shopId, id) {
 // ---------- Answers ----------
 
 async function getAnswers(shopId, questionId, filters = {}) {
-  const where = { questionId, shopId };
+  await settingsService.applyTimeBasedPublishing(shopId);
+
+  const where = { shopId };
+  if (questionId) where.questionId = questionId;
   if (filters.status) where.status = filters.status;
+  if (filters.search) {
+    where.answerText = { contains: filters.search, mode: "insensitive" };
+  }
 
   return prisma.answer.findMany({
     where,
     include: {
       contributor: { select: { id: true, name: true, email: true, trusted: true } },
+      question: { select: { id: true, question: true, status: true } },
       _count: { select: { votes: true } },
     },
-    orderBy: { voteScore: "desc" },
+    orderBy: [{ createdAt: "desc" }, { voteScore: "desc" }],
   });
 }
 
@@ -210,6 +220,7 @@ async function moderateAnswer(shopId, answerId, action) {
 // ---------- Analytics ----------
 
 async function getAnalytics(shopId) {
+  await settingsService.applyTimeBasedPublishing(shopId);
   const [
     totalQuestions, published, pending, suspended, categories,
     totalAnswers, publishedAnswers, totalContributors, trustedContributors,

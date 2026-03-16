@@ -46,9 +46,9 @@ This is a multi-tenant FAQ management system. Each **User** (shop owner) signs u
         │  Public Webhook URLs         │  JWT Auth
         │  (no auth needed)            │
         ▼                              │
-  /api/webhooks/{userId}/faq     ┌─────┴──────┐
-  /api/webhooks/{userId}/answer  │  Dashboard  │
-  /api/webhooks/{userId}/vote    │  (Next.js)  │
+  /api/webhooks/{webhookKey}/faq     ┌─────┴──────┐
+  /api/webhooks/{webhookKey}/answer  │  Dashboard  │
+  /api/webhooks/{webhookKey}/vote    │  (Next.js)  │
                                  └────────────┘
 ```
 
@@ -56,7 +56,7 @@ This is a multi-tenant FAQ management system. Each **User** (shop owner) signs u
 
 | Consumer | Auth Required | Endpoints Used |
 |----------|--------------|----------------|
-| **Ecommerce Frontend Plugin** (your target) | ❌ No | `/api/webhooks/:userId/*` |
+| **Ecommerce Frontend Plugin** (your target) | ❌ No | `/api/webhooks/:webhookKey/*` |
 | **Dashboard Admin** (shop owner) | ✅ JWT Bearer | `/api/questions`, `/api/answers`, `/api/settings`, etc. |
 
 ---
@@ -162,14 +162,14 @@ Token expires after **7 days**.
 The shop owner gets their webhook base URL from the dashboard:
 
 ```
-https://your-api-domain.com/api/webhooks/{userId}/faq
+https://your-api-domain.com/api/webhooks/{webhookKey}/faq
 ```
 
 ---
 
 ### 3.1 Submit a Question
 
-**`POST /api/webhooks/:userId/faq`**
+**`POST /api/webhooks/:webhookKey/faq`**
 
 A storefront visitor submits a new FAQ question.
 
@@ -183,6 +183,9 @@ A storefront visitor submits a new FAQ question.
 {
   "question": "How long does shipping take?",
   "answer": null,
+  "productId": "9440623329521",
+  "productHandle": "st3p-a-b-analogue-timer-time-delay-relay-in-pakistan",
+  "productTitle": "ST3P A/B Analogue Timer Time Delay Relay",
   "customer": {
     "email": "jane@example.com",
     "name": "Jane Smith",
@@ -196,6 +199,9 @@ A storefront visitor submits a new FAQ question.
 |-------|------|----------|-------------|
 | `question` | string | ✅ Yes | The question text. Also accepts `title` as alias. |
 | `answer` | string | No | Optional answer (for pre-answered submissions) |
+| `productId` | string | Recommended | Product ID from storefront context. Enables product-scoped FAQ retrieval. |
+| `productHandle` | string | Recommended | Product handle/slug. Used for product-scoped retrieval fallback. |
+| `productTitle` | string | No | Product title for context/debugging. |
 | `customer` | object | No | Customer details (highly recommended) |
 | `customer.email` | string | Recommended | Creates/finds a contributor record |
 | `customer.name` | string | No | Display name |
@@ -237,7 +243,7 @@ A storefront visitor submits a new FAQ question.
 
 ### 3.2 Submit an Answer
 
-**`POST /api/webhooks/:userId/answer`**
+**`POST /api/webhooks/:webhookKey/answer`**
 
 A storefront visitor submits an answer to an existing question.
 
@@ -289,7 +295,7 @@ A storefront visitor submits an answer to an existing question.
 
 ### 3.3 Cast a Vote
 
-**`POST /api/webhooks/:userId/vote`**
+**`POST /api/webhooks/:webhookKey/vote`**
 
 A storefront visitor votes on a question or answer.
 
@@ -350,7 +356,7 @@ A storefront visitor votes on a question or answer.
 
 ### 3.4 Get Published FAQs
 
-**`GET /api/webhooks/:userId/faq`**
+**`GET /api/webhooks/:webhookKey/faq`**
 
 Retrieve all published FAQs for display on the storefront. **Only returns published content — never exposes customer PII.**
 
@@ -358,10 +364,12 @@ Retrieve all published FAQs for display on the storefront. **Only returns publis
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
 | `categorySlug` | string | — | Filter by category slug |
+| `productId` | string | — | Filter to a specific product ID (exact match). |
+| `productHandle` | string | — | Filter to a specific product handle (used when `productId` is not supplied). |
 | `search` | string | — | Search in question and answer text |
 | `sort` | string | `"votes"` | Sort order: `"votes"`, `"newest"`, `"views"` |
 
-**Example:** `GET /api/webhooks/cm1user123/faq?sort=votes&categorySlug=shipping`
+**Example:** `GET /api/webhooks/cm1user123/faq?sort=votes&productId=9440623329521`
 
 **Response `200`:**
 ```json
@@ -402,6 +410,7 @@ Retrieve all published FAQs for display on the storefront. **Only returns publis
 
 **Important Notes:**
 - Only questions with status `"published"` are returned
+- If `productId` or `productHandle` is provided, only FAQs for that product are returned
 - Only answers with status `"published"` are included
 - Customer email, phone, and external ID are **never** exposed
 - Answers are sorted by `voteScore` descending (best answers first)
@@ -411,7 +420,7 @@ Retrieve all published FAQs for display on the storefront. **Only returns publis
 
 ### 3.5 Update a Question (via Webhook)
 
-**`PUT /api/webhooks/:userId/faq`**
+**`PUT /api/webhooks/:webhookKey/faq`**
 
 Update an existing question (typically used by the question author).
 
@@ -421,6 +430,8 @@ Update an existing question (typically used by the question author).
   "id": "cm1question789",
   "question": "Updated: How long does express shipping take?",
   "answer": "Express shipping takes 1-2 business days.",
+  "productId": "9440623329521",
+  "productHandle": "st3p-a-b-analogue-timer-time-delay-relay-in-pakistan",
   "customer": {
     "email": "jane@example.com"
   }
@@ -459,17 +470,19 @@ Get the current user's shop credentials and webhook URL.
     "accessToken": "••••••ef01",
     "name": "My Store"
   },
-  "webhookUrl": "http://localhost:4000/api/webhooks/cm1user123/faq"
+  "webhookUrl": "https://api.example.com/api/webhooks/cm1user123/faq"
 }
 ```
 
 > **Note:** `accessToken` is masked — only last 4 characters shown.
+>
+> **Webhook URL base resolution:** `PUBLIC_BACKEND_URL` (preferred) → `BACKEND_URL` (if public) → proxy headers (`X-Forwarded-Host` / `X-Forwarded-Proto`) → localhost fallback.
 
 **Response `200` (no shop):**
 ```json
 {
   "shop": null,
-  "webhookUrl": "http://localhost:4000/api/webhooks/cm1user123/faq"
+  "webhookUrl": "https://api.example.com/api/webhooks/cm1user123/faq"
 }
 ```
 
@@ -496,7 +509,7 @@ Save or update Shopify shop credentials.
 
 **Response `200`:** Same as GET response.
 
-> **CORS Note:** Webhook endpoints (`/api/webhooks/:userId/*`) allow browser requests when the request `Origin` matches any Shopify `domain` saved under that user. Save the exact storefront domain (for example: `app-development-store-grow.myshopify.com`).
+> **CORS Note:** Webhook endpoints (`/api/webhooks/:webhookKey/*`) allow browser requests when the request `Origin` matches any Shopify `domain` saved under that user. Save the exact storefront domain (for example: `app-development-store-grow.myshopify.com`).
 
 #### DELETE `/api/credentials`
 
@@ -1053,6 +1066,9 @@ views           Int       View count
 helpful         Int       Helpful vote count (legacy)
 notHelpful      Int       Not helpful count (legacy)
 voteScore       Int       Net score from votes (+1/-1 system)
+productId       String?   Product ID associated with the question
+productHandle   String?   Product handle/slug associated with the question
+productTitle    String?   Product title snapshot at submission time
 customerName    String?   Name of the person who asked
 customerEmail   String?   Email of the person who asked
 customerPhone   String?   Phone of the person who asked
@@ -1252,12 +1268,12 @@ ELSE
 As a frontend plugin developer, you only need the **public webhook endpoints** (Section 3). No authentication tokens are needed.
 
 **You will receive from the shop owner:**
-1. A `userId` string (e.g., `"cm1abc123def456"`)
+1. A `webhookKey` string (e.g., `"whk_4f1a9b..."`)
 2. The API base URL (e.g., `"https://faq-api.example.com"`)
 
 From these, construct the webhook base URL:
 ```
-{baseUrl}/api/webhooks/{userId}
+{baseUrl}/api/webhooks/{webhookKey}
 ```
 
 ### Typical Plugin Flow
@@ -1267,20 +1283,20 @@ From these, construct the webhook base URL:
 │                 STOREFRONT PAGE                       │
 │                                                       │
 │  1. Load FAQs                                         │
-│     GET /api/webhooks/{userId}/faq?sort=votes         │
+│     GET /api/webhooks/{webhookKey}/faq?sort=votes         │
 │           ↓                                           │
 │  2. Display FAQ list with vote buttons                │
 │           ↓                                           │
 │  3. Customer clicks "Ask a Question"                  │
 │     → Collect: question text + customer info          │
-│     POST /api/webhooks/{userId}/faq                   │
+│     POST /api/webhooks/{webhookKey}/faq                   │
 │           ↓                                           │
 │  4. Customer clicks "Answer" on a question            │
 │     → Collect: answer text + customer info            │
-│     POST /api/webhooks/{userId}/answer                │
+│     POST /api/webhooks/{webhookKey}/answer                │
 │           ↓                                           │
 │  5. Customer clicks ▲ or ▼ on question/answer         │
-│     POST /api/webhooks/{userId}/vote                  │
+│     POST /api/webhooks/{webhookKey}/vote                  │
 │                                                       │
 └──────────────────────────────────────────────────────┘
 ```
@@ -1404,7 +1420,7 @@ if (result.success) {
 The backend uses dynamic CORS:
 
 - Dashboard/auth endpoints allow `FRONTEND_URL` and optional `ALLOWED_ORIGINS` (comma-separated env var).
-- Webhook endpoints (`/api/webhooks/:userId/*`) allow requests when `Origin` matches a saved shop domain for that `userId`.
+- Webhook endpoints (`/api/webhooks/:webhookKey/*`) allow requests when `Origin` matches a saved shop domain for the store mapped by that `webhookKey`.
 - Requests without an `Origin` header (server-to-server calls, CLI tests) are allowed.
 
 Example backend env:

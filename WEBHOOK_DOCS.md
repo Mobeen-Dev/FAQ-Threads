@@ -11,7 +11,7 @@ The FAQ App exposes **public webhook endpoints** that allow ecommerce storefront
 Each registered user gets a **unique webhook URL** tied to their account:
 
 ```
-http://your-server.com/api/webhooks/{userId}/faq
+http://your-server.com/api/webhooks/{webhookKey}/faq
 ```
 
 This URL is generated when the user saves their Shopify credentials and is displayed on the **Credentials** page in the dashboard.
@@ -22,12 +22,12 @@ This URL is generated when the user saves their Shopify credentials and is displ
 
 | Endpoint | Auth Required? | Notes |
 |----------|---------------|-------|
-| `POST /api/webhooks/:userId/faq` | ❌ No | Public — storefront JS can call it |
-| `PUT  /api/webhooks/:userId/faq` | ❌ No | Public — uses question `id` for access control |
-| `GET  /api/webhooks/:userId/faq` | ❌ No | Public — returns only published FAQs |
+| `POST /api/webhooks/:webhookKey/faq` | ❌ No | Public — storefront JS can call it |
+| `PUT  /api/webhooks/:webhookKey/faq` | ❌ No | Public — uses question `id` for access control |
+| `GET  /api/webhooks/:webhookKey/faq` | ❌ No | Public — returns only published FAQs |
 | Dashboard APIs (`/api/questions/*`) | ✅ JWT | Admin-only, requires `Authorization: Bearer <token>` |
 
-> **Security note:** The `userId` in the URL acts as an unguessable identifier (CUID). For production, consider adding rate limiting and optional HMAC signature verification.
+> **Security note:** The `webhookKey` in the URL is an opaque random key generated per shop. Keep it private and rotate if exposed.
 
 ---
 
@@ -36,7 +36,7 @@ This URL is generated when the user saves their Shopify credentials and is displ
 ### 1. Submit a Question (POST)
 
 ```
-POST /api/webhooks/{userId}/faq
+POST /api/webhooks/{webhookKey}/faq
 Content-Type: application/json
 ```
 
@@ -92,7 +92,7 @@ Content-Type: application/json
 | Status | Condition |
 |--------|-----------|
 | 400 | Missing `question` field |
-| 404 | Invalid `userId` (no shop found) |
+| 404 | Invalid `webhookKey` (no shop found) |
 | 500 | Internal server error |
 
 ---
@@ -100,7 +100,7 @@ Content-Type: application/json
 ### 2. Update a Question (PUT)
 
 ```
-PUT /api/webhooks/{userId}/faq
+PUT /api/webhooks/{webhookKey}/faq
 Content-Type: application/json
 ```
 
@@ -149,9 +149,9 @@ Content-Type: application/json
 ### 3. Fetch Published FAQs (GET)
 
 ```
-GET /api/webhooks/{userId}/faq
-GET /api/webhooks/{userId}/faq?categorySlug=shipping
-GET /api/webhooks/{userId}/faq?search=return
+GET /api/webhooks/{webhookKey}/faq
+GET /api/webhooks/{webhookKey}/faq?categorySlug=shipping
+GET /api/webhooks/{webhookKey}/faq?search=return
 ```
 
 #### Query Parameters
@@ -191,7 +191,7 @@ GET /api/webhooks/{userId}/faq?search=return
 ## Data Flow Diagram
 
 ```
-┌─────────────────────┐       POST /api/webhooks/{userId}/faq
+┌─────────────────────┐       POST /api/webhooks/{webhookKey}/faq
 │  Shopify Storefront  │ ─────────────────────────────────────────►┌──────────────┐
 │  (Customer Browser)  │                                           │              │
 │                      │◄──────────────────────────────────────────│   Backend    │
@@ -199,7 +199,7 @@ GET /api/webhooks/{userId}/faq?search=return
 │   form / widget      │                                           │              │
 └─────────────────────┘                                            │              │
                                                                    │   Webhook    │
-┌─────────────────────┐       GET /api/webhooks/{userId}/faq       │   Routes     │──────►┌────────────┐
+┌─────────────────────┐       GET /api/webhooks/{webhookKey}/faq       │   Routes     │──────►┌────────────┐
 │  Storefront FAQ Page │ ─────────────────────────────────────────►│              │       │ PostgreSQL │
 │  (Public display)    │◄──────────────────────────────────────────│              │◄──────│ (Prisma)   │
 │                      │       { faqs: [...] }                     │              │       └────────────┘
@@ -414,7 +414,7 @@ The test script performs 19 test sections covering:
 ## CORS & Security Considerations
 
 - The webhook endpoints are **public** (no auth) — this is intentional so storefront JavaScript can call them
-- The `userId` in the URL is a CUID (unguessable random string), not a sequential number
+- The `webhookKey` in the URL is an opaque random value, not a sequential identifier
 - The GET endpoint **never exposes** customer PII (email, phone, ID)
 - For production, consider:
   - **Rate limiting** (e.g., `express-rate-limit`) on webhook POST

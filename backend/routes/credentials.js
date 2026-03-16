@@ -1,9 +1,81 @@
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 const prisma = require("../services/prismaClient");
 const authMiddleware = require("../middleware/auth");
 
 router.use(authMiddleware);
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+function parseForwardedHeader(value) {
+  if (!value || typeof value !== "string") return "";
+  return value.split(",")[0].trim();
+}
+
+function normalizeBaseUrl(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+}
+
+function isLocalBaseUrl(value) {
+  const normalized = normalizeBaseUrl(value);
+  if (!normalized) return false;
+  try {
+    const parsed = new URL(normalized);
+    return LOCAL_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function resolvePublicBaseUrl(req) {
+  const configuredBase = normalizeBaseUrl(process.env.PUBLIC_BACKEND_URL || process.env.BACKEND_URL);
+  if (configuredBase && !isLocalBaseUrl(configuredBase)) {
+    return configuredBase;
+  }
+
+  const host = parseForwardedHeader(req.headers["x-forwarded-host"]) || req.get("host");
+  const proto = parseForwardedHeader(req.headers["x-forwarded-proto"]) || req.protocol || "http";
+  const requestBase = host ? normalizeBaseUrl(`${proto}://${host}`) : "";
+  if (requestBase && !isLocalBaseUrl(requestBase)) {
+    return requestBase;
+  }
+
+  return configuredBase || "http://localhost:4000";
+}
+
+function buildWebhookUrl(req, identifier) {
+  return `${resolvePublicBaseUrl(req)}/api/webhooks/${identifier}/faq`;
+}
+
+function generateWebhookKey() {
+  return `whk_${crypto.randomBytes(20).toString("hex")}`;
+}
+
+async function ensureShopWebhookKey(shopId) {
+  const updated = await prisma.shop.update({
+    where: { id: shopId },
+    data: { webhookKey: generateWebhookKey() },
+  });
+  return updated.webhookKey;
+}
+
+async function getWebhookIdentifier(shop) {
+  if (shop.webhookKey) return shop.webhookKey;
+  return ensureShopWebhookKey(shop.id);
+}
+
+async function buildShopWebhookUrl(req, shop) {
+  const identifier = await getWebhookIdentifier(shop);
+  return buildWebhookUrl(req, identifier);
+}
 
 // Get user's Shopify credentials
 router.get("/", async (req, res, next) => {
@@ -24,7 +96,7 @@ router.get("/", async (req, res, next) => {
         accessToken: shop.accessToken ? "••••••" + shop.accessToken.slice(-4) : null,
         name: shop.name,
       },
-      webhookUrl: `${process.env.BACKEND_URL || "http://localhost:4000"}/api/webhooks/${req.userId}/faq`,
+      webhookUrl: await buildShopWebhookUrl(req, shop),
     });
   } catch (error) {
     next(error);
@@ -52,6 +124,7 @@ router.post("/", async (req, res, next) => {
       },
       create: {
         domain,
+        webhookKey: generateWebhookKey(),
         apiKey,
         accessToken,
         name,
@@ -67,7 +140,7 @@ router.post("/", async (req, res, next) => {
         accessToken: shop.accessToken ? "••••••" + shop.accessToken.slice(-4) : null,
         name: shop.name,
       },
-      webhookUrl: `${process.env.BACKEND_URL || "http://localhost:4000"}/api/webhooks/${req.userId}/faq`,
+      webhookUrl: await buildShopWebhookUrl(req, shop),
     });
   } catch (error) {
     next(error);

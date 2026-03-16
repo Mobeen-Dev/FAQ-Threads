@@ -4,21 +4,29 @@ const prisma = require("../services/prismaClient");
 const contributorService = require("../services/contributorService");
 const settingsService = require("../services/settingsService");
 
+async function findShopByWebhookIdentifier(identifier) {
+  return prisma.shop.findFirst({
+    where: {
+      OR: [{ webhookKey: identifier }, { userId: identifier }],
+    },
+  });
+}
+
 /**
- * POST /api/webhooks/:userId/faq
+ * POST /api/webhooks/:identifier/faq
  * Receive a new FAQ question from a storefront.
  */
-router.post("/:userId/faq", async (req, res) => {
+router.post("/:identifier/faq", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { identifier } = req.params;
     const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
     if (!payload.question && !payload.title) {
       return res.status(400).json({ error: "Field 'question' is required" });
     }
 
-    const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    const shop = await findShopByWebhookIdentifier(identifier);
+    if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
 
     const customer = payload.customer || {};
     const customerEmail = customer.email || payload.customerEmail || null;
@@ -46,6 +54,9 @@ router.post("/:userId/faq", async (req, res) => {
         answer: payload.answer || "",
         status,
         source: "webhook",
+        productId: payload.productId ? String(payload.productId) : null,
+        productHandle: payload.productHandle ? String(payload.productHandle) : null,
+        productTitle: payload.productTitle ? String(payload.productTitle) : null,
         customerName: customer.name || payload.customerName || null,
         customerEmail,
         customerPhone: customer.phone || payload.customerPhone || null,
@@ -69,20 +80,20 @@ router.post("/:userId/faq", async (req, res) => {
 });
 
 /**
- * POST /api/webhooks/:userId/answer
+ * POST /api/webhooks/:identifier/answer
  * Submit an answer from the storefront.
  */
-router.post("/:userId/answer", async (req, res) => {
+router.post("/:identifier/answer", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { identifier } = req.params;
     const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
     if (!payload.questionId || !payload.answerText) {
       return res.status(400).json({ error: "questionId and answerText are required" });
     }
 
-    const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    const shop = await findShopByWebhookIdentifier(identifier);
+    if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
 
     const question = await prisma.question.findFirst({ where: { id: payload.questionId, shopId: shop.id } });
     if (!question) return res.status(404).json({ error: "Question not found" });
@@ -130,12 +141,12 @@ router.post("/:userId/answer", async (req, res) => {
 });
 
 /**
- * POST /api/webhooks/:userId/vote
+ * POST /api/webhooks/:identifier/vote
  * Cast a vote from the storefront.
  */
-router.post("/:userId/vote", async (req, res) => {
+router.post("/:identifier/vote", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { identifier } = req.params;
     const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { entityType, entityId, voteValue, customer } = payload;
 
@@ -143,8 +154,8 @@ router.post("/:userId/vote", async (req, res) => {
       return res.status(400).json({ error: "entityType, entityId, voteValue, and customer.email are required" });
     }
 
-    const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    const shop = await findShopByWebhookIdentifier(identifier);
+    if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
 
     const contributor = await contributorService.findOrCreateContributor(shop.id, customer);
     if (contributor?.status === "suspended") {
@@ -161,18 +172,18 @@ router.post("/:userId/vote", async (req, res) => {
 });
 
 /**
- * PUT /api/webhooks/:userId/faq
+ * PUT /api/webhooks/:identifier/faq
  * Update an existing FAQ question.
  */
-router.put("/:userId/faq", async (req, res) => {
+router.put("/:identifier/faq", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { identifier } = req.params;
     const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
     if (!payload.id) return res.status(400).json({ error: "Question 'id' is required for updates" });
 
-    const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    const shop = await findShopByWebhookIdentifier(identifier);
+    if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
 
     const existing = await prisma.question.findFirst({ where: { id: payload.id, shopId: shop.id } });
     if (!existing) return res.status(404).json({ error: "Question not found" });
@@ -182,6 +193,9 @@ router.put("/:userId/faq", async (req, res) => {
     if (payload.question) updateData.question = payload.question;
     if (payload.answer !== undefined) updateData.answer = payload.answer;
     if (payload.status) updateData.status = payload.status;
+    if (payload.productId !== undefined) updateData.productId = payload.productId ? String(payload.productId) : null;
+    if (payload.productHandle !== undefined) updateData.productHandle = payload.productHandle ? String(payload.productHandle) : null;
+    if (payload.productTitle !== undefined) updateData.productTitle = payload.productTitle ? String(payload.productTitle) : null;
     if (customer.name || payload.customerName) updateData.customerName = customer.name || payload.customerName;
     if (customer.email || payload.customerEmail) updateData.customerEmail = customer.email || payload.customerEmail;
     if (customer.phone || payload.customerPhone) updateData.customerPhone = customer.phone || payload.customerPhone;
@@ -201,18 +215,27 @@ router.put("/:userId/faq", async (req, res) => {
 });
 
 /**
- * GET /api/webhooks/:userId/faq
+ * GET /api/webhooks/:identifier/faq
  * Public endpoint: returns published FAQs sorted by vote score, with answers.
  */
-router.get("/:userId/faq", async (req, res) => {
+router.get("/:identifier/faq", async (req, res) => {
   try {
-    const { userId } = req.params;
-    const { categorySlug, search, sort = "votes" } = req.query;
+    const { identifier } = req.params;
+    const { categorySlug, search, sort = "votes", productId, productHandle } = req.query;
 
-    const shop = await prisma.shop.findFirst({ where: { userId } });
-    if (!shop) return res.status(404).json({ error: "No shop found for this user" });
+    const shop = await findShopByWebhookIdentifier(identifier);
+    if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
+    await settingsService.applyTimeBasedPublishing(shop.id);
 
     const where = { shopId: shop.id, status: "published" };
+
+    // Product-scoped filtering for storefront pages.
+    // If productId is provided, it takes priority over productHandle.
+    if (productId) {
+      where.productId = String(productId);
+    } else if (productHandle) {
+      where.productHandle = String(productHandle);
+    }
 
     if (categorySlug) {
       const category = await prisma.category.findFirst({ where: { shopId: shop.id, slug: categorySlug } });

@@ -5,8 +5,12 @@ const router = express.Router();
 const prisma = require("../services/prismaClient");
 const authMiddleware = require("../middleware/auth");
 
-const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "7d";
+
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT_SECRET. Set JWT_SECRET in backend/.env");
+}
 
 // Sign up
 router.post("/signup", async (req, res, next) => {

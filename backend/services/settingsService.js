@@ -21,6 +21,46 @@ const DEFAULTS = {
   trustedCustomerAutoPublish: false,
 };
 
+function normalizeQuestionPublishingModes(values) {
+  const mode = values.autoPublishQuestions
+    ? "auto"
+    : values.publishQuestionsAfterTimeEnabled
+      ? "time"
+      : "manual";
+
+  return {
+    autoPublishQuestions: mode === "auto",
+    publishQuestionsAfterTimeEnabled: mode === "time",
+    manualPublishQuestions: mode === "manual",
+  };
+}
+
+function normalizeAnswerPublishingModes(values) {
+  const mode = values.autoPublishAnswers
+    ? "auto"
+    : values.publishAnswersAfterTimeEnabled
+      ? "time"
+      : "manual";
+
+  return {
+    autoPublishAnswers: mode === "auto",
+    publishAnswersAfterTimeEnabled: mode === "time",
+    manualPublishAnswers: mode === "manual",
+  };
+}
+
+async function isTrustedContributor(contributorId) {
+  if (!contributorId) return false;
+  const contributor = await prisma.storeContributor.findUnique({ where: { id: contributorId } });
+  return !!contributor?.trusted;
+}
+
+function getDelayMs(hours, minutes) {
+  const safeHours = Math.max(0, Number(hours) || 0);
+  const safeMinutes = Math.max(0, Number(minutes) || 0);
+  return (safeHours * 60 + safeMinutes) * 60 * 1000;
+}
+
 async function getSettings(shopId) {
   let settings = await prisma.setting.findUnique({ where: { shopId } });
   if (!settings) {
@@ -30,16 +70,24 @@ async function getSettings(shopId) {
 }
 
 async function updateSettings(shopId, data) {
+  const current = await getSettings(shopId);
   const allowed = Object.keys(DEFAULTS);
   const updateData = {};
   for (const key of allowed) {
     if (data[key] !== undefined) updateData[key] = data[key];
   }
 
+  const merged = { ...DEFAULTS, ...current, ...updateData };
+  const normalized = {
+    ...updateData,
+    ...normalizeQuestionPublishingModes(merged),
+    ...normalizeAnswerPublishingModes(merged),
+  };
+
   return prisma.setting.upsert({
     where: { shopId },
-    update: updateData,
-    create: { shopId, ...DEFAULTS, ...updateData },
+    update: normalized,
+    create: { shopId, ...DEFAULTS, ...normalized },
   });
 }
 
@@ -47,20 +95,11 @@ async function updateSettings(shopId, data) {
 async function resolveQuestionStatus(shopId, contributorId) {
   const settings = await getSettings(shopId);
 
-  if (settings.autoPublishQuestions) {
-    // Check trusted customer override
-    if (contributorId && settings.trustedCustomerAutoPublish) {
-      const contributor = await prisma.storeContributor.findUnique({ where: { id: contributorId } });
-      if (contributor?.trusted) return "published";
-    }
+  if (settings.trustedCustomerAutoPublish && await isTrustedContributor(contributorId)) {
     return "published";
   }
 
-  // Trusted customer auto-publish even when general auto-publish is off
-  if (contributorId && settings.trustedCustomerAutoPublish) {
-    const contributor = await prisma.storeContributor.findUnique({ where: { id: contributorId } });
-    if (contributor?.trusted) return "published";
-  }
+  if (settings.autoPublishQuestions) return "published";
 
   return "pending";
 }
@@ -69,28 +108,37 @@ async function resolveQuestionStatus(shopId, contributorId) {
 async function resolveAnswerStatus(shopId, questionId, contributorId) {
   const settings = await getSettings(shopId);
 
-  if (settings.autoPublishAnswers) {
-    if (contributorId && settings.trustedCustomerAutoPublish) {
-      const contributor = await prisma.storeContributor.findUnique({ where: { id: contributorId } });
-      if (contributor?.trusted) return "published";
-    }
+  if (settings.trustedCustomerAutoPublish && await isTrustedContributor(contributorId)) {
     return "published";
   }
 
-  if (contributorId && settings.trustedCustomerAutoPublish) {
-    const contributor = await prisma.storeContributor.findUnique({ where: { id: contributorId } });
-    if (contributor?.trusted) return "published";
-  }
-
-  // Auto-publish if existing answers are below threshold
-  if (settings.autoPublishIfAnswersLessThan > 0) {
-    const count = await prisma.answer.count({
-      where: { questionId, status: "published" },
-    });
-    if (count < settings.autoPublishIfAnswersLessThan) return "published";
-  }
+  if (settings.autoPublishAnswers) return "published";
 
   return "pending";
+}
+
+// Opportunistic scheduler: publish pending entries once they pass configured time threshold.
+async function applyTimeBasedPublishing(shopId) {
+  const settings = await getSettings(shopId);
+  const now = new Date();
+
+  if (settings.publishQuestionsAfterTimeEnabled) {
+    const delayMs = getDelayMs(settings.publishQuestionsAfterHours, settings.publishQuestionsAfterMinutes);
+    const cutoff = new Date(now.getTime() - delayMs);
+    await prisma.question.updateMany({
+      where: { shopId, status: "pending", createdAt: { lte: cutoff } },
+      data: { status: "published", publishedAt: now },
+    });
+  }
+
+  if (settings.publishAnswersAfterTimeEnabled) {
+    const delayMs = getDelayMs(settings.publishAnswersAfterHours, settings.publishAnswersAfterMinutes);
+    const cutoff = new Date(now.getTime() - delayMs);
+    await prisma.answer.updateMany({
+      where: { shopId, status: "pending", createdAt: { lte: cutoff } },
+      data: { status: "published", publishedAt: now },
+    });
+  }
 }
 
 module.exports = {
@@ -99,4 +147,5 @@ module.exports = {
   updateSettings,
   resolveQuestionStatus,
   resolveAnswerStatus,
+  applyTimeBasedPublishing,
 };

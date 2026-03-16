@@ -1,0 +1,131 @@
+name: CI/CD (deploy branch)
+
+on:
+  push:
+    branches: [deploy]
+  pull_request:
+    branches: [deploy]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy on self-hosted runner
+    runs-on: self-hosted
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      # - name: 🔐 Validate deploy env file
+      #   run: |
+      #     if [ ! -f deploy/.env.production ]; then
+      #       echo "Missing deploy/.env.production on self-hosted runner."
+      #       echo "Copy deploy/.env.production.example and fill production secrets."
+      #       exit 1
+      #     fi
+
+      # - name: 🛑 Stop Current Services
+      #   run: |
+      #     echo "Stopping current services..."
+      #     docker compose -f deploy/docker-compose.deploy.yml down --remove-orphans || true
+
+      # - name: 💾 Backup current app images
+      #   run: |
+      #     for image in faq-app-backend faq-app-frontend; do
+      #       if docker image inspect "${image}:latest" > /dev/null 2>&1; then
+      #         docker tag "${image}:latest" "${image}:backup"
+      #         echo "Backed up ${image}:latest -> ${image}:backup"
+      #       fi
+      #     done
+
+      # - name: 🧹 Clean Up Old Images (Optional)
+      #   run: |
+      #     echo "Cleaning up old images..."
+      #     docker image prune -f || true
+
+      # - name: 🏗️ Build and Start Services
+      #   run: |
+      #     echo "Building and starting services..."
+      #     docker compose -f deploy/docker-compose.deploy.yml up -d --build --remove-orphans
+
+      # - name: ⏱️ Wait for Services to Start
+      #   run: |
+      #     echo "Waiting for services to initialize..."
+      #     sleep 20
+
+      # - name: 🐘 Check PostgreSQL Health
+      #   run: |
+      #     echo "Checking PostgreSQL health..."
+      #     CONTAINER_ID=$(docker compose -f deploy/docker-compose.deploy.yml ps -q postgres)
+      #     if [ -z "$CONTAINER_ID" ]; then
+      #       echo "❌ PostgreSQL container not found"
+      #       exit 1
+      #     fi
+      #     for i in {1..12}; do
+      #       STATUS=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$CONTAINER_ID")
+      #       if [ "$STATUS" = "healthy" ]; then
+      #         echo "✅ PostgreSQL is healthy!"
+      #         exit 0
+      #       fi
+      #       echo "Attempt $i/12: PostgreSQL status=$STATUS, waiting 10s..."
+      #       sleep 10
+      #     done
+      #     echo "❌ PostgreSQL health check failed!"
+      #     exit 1
+
+      # - name: 🏥 Check Backend Health
+      #   run: |
+      #     echo "Checking backend health..."
+      #     for i in {1..12}; do
+      #       if curl -fsS http://localhost:4000/health > /dev/null; then
+      #         echo "✅ Backend is healthy!"
+      #         exit 0
+      #       fi
+      #       echo "Attempt $i/12: Backend not ready, waiting 10s..."
+      #       sleep 10
+      #     done
+      #     echo "❌ Backend health check failed!"
+      #     exit 1
+
+      # - name: 🌐 Check Frontend Health
+      #   run: |
+      #     echo "Checking frontend health..."
+      #     for i in {1..12}; do
+      #       if curl -fsS http://localhost:3000/login > /dev/null; then
+      #         echo "✅ Frontend is healthy!"
+      #         exit 0
+      #       fi
+      #       echo "Attempt $i/12: Frontend not ready, waiting 10s..."
+      #       sleep 10
+      #     done
+      #     echo "❌ Frontend health check failed!"
+      #     exit 1
+
+      # - name: ✅ Deployment Success
+      #   run: |
+      #     echo "🎉 Deployment completed successfully!"
+      #     echo "Frontend: http://localhost:3000"
+      #     echo "Backend:  http://localhost:4000/health"
+      #     docker compose -f deploy/docker-compose.deploy.yml ps
+
+      # - name: 🚨 Rollback on Failure
+      #   if: failure()
+      #   run: |
+      #     echo "💥 Deployment failed! Attempting rollback..."
+      #     docker compose -f deploy/docker-compose.deploy.yml down || true
+
+      #     if docker image inspect faq-app-backend:backup > /dev/null 2>&1 && docker image inspect faq-app-frontend:backup > /dev/null 2>&1; then
+      #       docker tag faq-app-backend:backup faq-app-backend:latest
+      #       docker tag faq-app-frontend:backup faq-app-frontend:latest
+      #       docker compose -f deploy/docker-compose.deploy.yml up -d --no-build --remove-orphans
+      #       sleep 20
+      #       if curl -fsS http://localhost:4000/health > /dev/null; then
+      #         echo "✅ Rollback successful!"
+      #       else
+      #         echo "❌ Rollback failed!"
+      #         exit 1
+      #       fi
+      #     else
+      #       echo "No backup images available, rollback skipped."
+      #       exit 1
+      #     fi

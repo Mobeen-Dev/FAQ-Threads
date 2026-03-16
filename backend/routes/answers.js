@@ -5,13 +5,12 @@ const authMiddleware = require("../middleware/auth");
 
 router.use(authMiddleware);
 
-// GET /api/answers?questionId=xxx — list answers for a question
+// GET /api/answers?questionId=xxx&status=published&search=text — list answers
 router.get("/", async (req, res, next) => {
   try {
     if (!req.shopId) return res.json({ answers: [] });
-    const { questionId, status } = req.query;
-    if (!questionId) return res.status(400).json({ error: "questionId is required" });
-    const answers = await faqService.getAnswers(req.shopId, questionId, { status });
+    const { questionId, status, search } = req.query;
+    const answers = await faqService.getAnswers(req.shopId, questionId, { status, search });
     res.json({ answers });
   } catch (error) {
     next(error);

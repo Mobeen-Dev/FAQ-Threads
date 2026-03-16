@@ -21,6 +21,7 @@ model User {
 model Shop {
   id                String             @id @default(cuid())
   domain            String
+  webhookKey        String?            @unique
   accessToken       String?
   apiKey            String?
   name              String?
@@ -66,6 +67,9 @@ model Question {
   helpful       Int       @default(0)
   notHelpful    Int       @default(0)
   voteScore     Int       @default(0)
+  productId     String?
+  productHandle String?
+  productTitle  String?
   customerName  String?
   customerEmail String?
   customerPhone String?
@@ -84,6 +88,8 @@ model Question {
   updatedAt     DateTime  @updatedAt
 
   @@index([shopId, status])
+  @@index([shopId, productId, status])
+  @@index([shopId, productHandle, status])
   @@index([shopId, categoryId])
   @@index([shopId, voteScore])
   @@index([customerEmail])
