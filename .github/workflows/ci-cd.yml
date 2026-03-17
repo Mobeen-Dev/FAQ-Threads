@@ -20,12 +20,11 @@ jobs:
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           set -e
-          required=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB FRONTEND_URL BACKEND_URL NEXT_PUBLIC_API_URL JWT_SECRET)
+          required=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB FRONTEND_URL BACKEND_URL JWT_SECRET)
           for key in "${required[@]}"; do
             if [ -z "${!key}" ]; then
               echo "❌ Missing required secret: $key"
@@ -35,10 +34,8 @@ jobs:
 
           FRONTEND_URL="${FRONTEND_URL%/}"
           BACKEND_URL="${BACKEND_URL%/}"
-          NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL%/}"
-          if [[ "$NEXT_PUBLIC_API_URL" != */api ]]; then
-            NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}/api"
-          fi
+          NEXT_PUBLIC_API_URL="/api"
+          INTERNAL_API_URL="http://backend:4004/api"
           if [ -z "$ALLOWED_ORIGINS" ]; then
             ALLOWED_ORIGINS="$FRONTEND_URL"
           fi
@@ -50,6 +47,7 @@ jobs:
           FRONTEND_URL=${FRONTEND_URL}
           BACKEND_URL=${BACKEND_URL}
           NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+          INTERNAL_API_URL=${INTERNAL_API_URL}
           ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
           JWT_SECRET=${JWT_SECRET}
           EOF

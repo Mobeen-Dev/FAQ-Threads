@@ -35,19 +35,18 @@ export function resolveApiBase() {
     return configured || "http://localhost:4004/api";
   }
 
-  const currentHost = window.location.hostname;
-  const currentProtocol = window.location.protocol;
-  const inferred = `${currentProtocol}//${currentHost}:4004/api`;
+  if (!configured) return "/api";
 
-  if (!configured) return inferred;
+  if (configured.startsWith("/")) return configured;
 
   try {
+    const currentHost = window.location.hostname;
     const parsed = new URL(configured);
     if (isLocalHost(parsed.hostname) && !isLocalHost(currentHost)) {
-      return inferred;
+      return "/api";
     }
     return ensureApiPath(configured);
   } catch {
-    return ensureApiPath(configured);
+    return configured.startsWith("/") ? configured : "/api";
   }
 }
