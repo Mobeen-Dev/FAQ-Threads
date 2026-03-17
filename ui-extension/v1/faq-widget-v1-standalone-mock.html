@@ -1,0 +1,942 @@
+<div
+  class="sfq-block"
+  data-sfq-block
+  data-webhook-url="https://your-api.com/api/webhooks/USER_ID/faq"
+>
+  <style>
+    .sfq-block {
+      margin: 2rem 0;
+      color: inherit;
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .sfq-section {
+      color: inherit;
+      font: inherit;
+    }
+
+    .sfq-header {
+      margin-bottom: 1rem;
+    }
+
+    .sfq-title {
+      margin: 0;
+      font: inherit;
+      font-size: clamp(1.35rem, 2.3vw, 1.7rem);
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .sfq-subtitle {
+      margin: 0.35rem 0 0;
+      opacity: 0.75;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    .sfq-toast {
+      margin: 0 0 0.8rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      background: rgba(0, 0, 0, 0.03);
+      display: none;
+    }
+
+    .sfq-toast.is-visible {
+      display: block;
+    }
+
+    .sfq-message {
+      margin: 0 0 0.8rem;
+      padding: 0.52rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      font-size: 0.98rem;
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .sfq-message--error {
+      border-color: rgba(193, 27, 23, 0.35);
+      background: rgba(193, 27, 23, 0.06);
+    }
+
+    .sfq-error-wrap {
+      margin-bottom: 0.8rem;
+      display: grid;
+      justify-items: start;
+      gap: 0.45rem;
+    }
+
+    .sfq-list {
+      display: grid;
+      gap: 0.6rem;
+    }
+
+    .sfq-item {
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 8px;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    .sfq-summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.7rem;
+      padding: 0.75rem 0.85rem;
+      font-weight: 600;
+      font-size: 1rem;
+      line-height: 1.42;
+    }
+
+    .sfq-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .sfq-summary-meta {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.84rem;
+      opacity: 0.7;
+      padding-right: 0.9rem;
+      position: relative;
+    }
+
+    .sfq-summary-meta::after {
+      content: "";
+      width: 0.42rem;
+      height: 0.42rem;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      position: absolute;
+      right: 0;
+      transform: rotate(45deg);
+      transition: transform 0.15s ease;
+    }
+
+    .sfq-item[open] .sfq-summary-meta::after {
+      transform: rotate(225deg);
+    }
+
+    .sfq-pill {
+      border: 1px solid rgba(0, 0, 0, 0.14);
+      border-radius: 999px;
+      padding: 0.16rem 0.45rem;
+      font-size: 0.8rem;
+      line-height: 1;
+    }
+
+    .sfq-panel {
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+      padding: 0.72rem 0.85rem 0.82rem;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .sfq-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+      margin-bottom: 0.55rem;
+      font-size: 0.88rem;
+      opacity: 0.75;
+    }
+
+    .sfq-pending {
+      border: 1px solid rgba(180, 80, 0, 0.25);
+      border-radius: 999px;
+      padding: 0.12rem 0.45rem;
+      background: rgba(255, 166, 0, 0.12);
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .sfq-answer-heading {
+      margin: 0 0 0.28rem;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      opacity: 0.7;
+    }
+
+    .sfq-answer-text {
+      margin: 0;
+    }
+
+    .sfq-answer-list {
+      margin: 0.62rem 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .sfq-answer-item {
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 7px;
+      padding: 0.5rem 0.55rem;
+      font-size: 0.97rem;
+      background: rgba(0, 0, 0, 0.015);
+    }
+
+    .sfq-answer-meta {
+      margin-top: 0.35rem;
+      font-size: 0.86rem;
+      opacity: 0.7;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .sfq-link {
+      margin-top: 0.45rem;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      font-size: 0.92rem;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      opacity: 0.8;
+      padding: 0;
+    }
+
+    .sfq-composer {
+      margin-top: 0.65rem;
+      padding-top: 0.62rem;
+      border-top: 1px dashed rgba(0, 0, 0, 0.16);
+    }
+
+    .sfq-form {
+      margin-top: 0.5rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .sfq-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .sfq-textarea {
+      width: 100%;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      padding: 0.65rem 0.72rem;
+      color: inherit;
+      font: inherit;
+      background: transparent;
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .sfq-textarea:focus {
+      outline: 2px solid rgba(0, 0, 0, 0.15);
+      outline-offset: 0;
+    }
+
+    .sfq-btn,
+    .sfq-btn-secondary {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .sfq-btn {
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      background: #111;
+      color: #fff;
+      padding: 0.56rem 0.82rem;
+      font-size: 0.96rem;
+    }
+
+    .sfq-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .sfq-btn-secondary {
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      background: transparent;
+      color: inherit;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.9rem;
+    }
+
+    .sfq-empty,
+    .sfq-status {
+      margin: 0;
+      font-size: 1rem;
+      opacity: 0.75;
+      line-height: 1.5;
+    }
+
+    .sfq-skeleton {
+      display: grid;
+      gap: 0.5rem;
+      margin: 0.55rem 0 0.35rem;
+    }
+
+    .sfq-skeleton-line {
+      height: 0.65rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 20%, rgba(0, 0, 0, 0.12) 45%, rgba(0, 0, 0, 0.06) 70%);
+      background-size: 220% 100%;
+      animation: sfq-shimmer 1.2s linear infinite;
+    }
+
+    .sfq-skeleton-line.short {
+      width: 48%;
+    }
+
+    .sfq-ask {
+      margin-top: 1rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .sfq-ask-title {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .sfq-ask-copy {
+      margin: 0.35rem 0 0;
+      font-size: 0.98rem;
+      opacity: 0.75;
+      line-height: 1.45;
+    }
+
+    @keyframes sfq-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+
+  <section class="sfq-section" aria-label="Product FAQs">
+    <header class="sfq-header">
+      <h2 class="sfq-title">Product FAQs</h2>
+      <p class="sfq-subtitle">Questions from shoppers and answers from the community.</p>
+    </header>
+
+    <p class="sfq-toast" data-role="toast" role="status" aria-live="polite"></p>
+    <div data-role="content" aria-live="polite"></div>
+  </section>
+
+  <script>
+    (function () {
+      var root = (document.currentScript && document.currentScript.closest("[data-sfq-block]"))
+        || document.querySelector("[data-sfq-block]");
+      if (!root) return;
+
+      function toInt(value, fallback) {
+        var parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? fallback : parsed;
+      }
+
+      function normalizeFaqUrl(rawUrl) {
+        var url = String(rawUrl || "").trim();
+        if (!url) return "";
+        return url.replace(/\/+$/, "");
+      }
+
+      function buildAnswerUrl(faqUrl, explicitAnswerUrl) {
+        var answerUrl = normalizeFaqUrl(explicitAnswerUrl);
+        if (answerUrl) return answerUrl;
+        if (!faqUrl) return "";
+        if (/\/faq(\?|$)/i.test(faqUrl)) {
+          return faqUrl.replace(/\/faq(\?|$)/i, "/answer$1");
+        }
+        return faqUrl + "/answer";
+      }
+
+      function readConfig() {
+        var faqUrl = normalizeFaqUrl(root.getAttribute("data-webhook-url"));
+        var storefrontPage = window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.page
+          ? window.ShopifyAnalytics.meta.page
+          : null;
+        var inferredHandleMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
+        var inferredProductHandle = inferredHandleMatch ? decodeURIComponent(inferredHandleMatch[1]) : "";
+        var inferredProductTitle = document.title ? document.title.replace(/\s*\|\s*.+$/, "").trim() : "";
+        var inferredCustomerId = storefrontPage && (storefrontPage.customerId || storefrontPage.customer_id)
+          ? String(storefrontPage.customerId || storefrontPage.customer_id)
+          : (window.__st && window.__st.cid ? String(window.__st.cid) : "");
+        var config = {
+          faqUrl: faqUrl,
+          answerUrl: buildAnswerUrl(faqUrl, ""),
+          loginUrl: "/account/login",
+          sort: "votes",
+          maxInlineAnswers: 2,
+          loadingText: "Loading frequently asked questions...",
+          product: {
+            id: storefrontPage && storefrontPage.resourceId ? String(storefrontPage.resourceId) : "",
+            handle: inferredProductHandle,
+            title: inferredProductTitle
+          },
+          customer: {
+            loggedIn: Boolean(inferredCustomerId),
+            name: "",
+            email: ""
+          }
+        };
+        return config;
+      }
+
+      var config = readConfig();
+      var content = root.querySelector('[data-role="content"]');
+      var toast = root.querySelector('[data-role="toast"]');
+      var state = {
+        loading: false,
+        error: "",
+        notice: "",
+        faqs: [],
+        submittingQuestion: false,
+        submittingAnswerByQuestion: {},
+        openAnswerFormId: "",
+        expandedExtraAnswerIds: {},
+        openQuestionId: ""
+      };
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function nl2br(value) {
+        return escapeHtml(value).replace(/\n/g, "<br>");
+      }
+
+      function formatDate(iso) {
+        if (!iso) return "";
+        var date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function getAnswerCount(faq) {
+        var answers = Array.isArray(faq.answers) ? faq.answers.length : 0;
+        var direct = faq.answer && String(faq.answer).trim() ? 1 : 0;
+        if (faq._count && typeof faq._count.answers === "number") {
+          return Math.max(faq._count.answers, answers + direct);
+        }
+        return answers + direct;
+      }
+
+      function splitAnswers(faq) {
+        var answers = Array.isArray(faq.answers) ? faq.answers : [];
+        var directAnswer = typeof faq.answer === "string" ? faq.answer.trim() : "";
+        if (directAnswer) {
+          return { primary: { answerText: directAnswer, pendingLocal: faq.pendingLocal }, extra: answers };
+        }
+        if (answers.length) {
+          return { primary: answers[0], extra: answers.slice(1) };
+        }
+        return { primary: null, extra: [] };
+      }
+
+      function sortFaqs(faqs) {
+        var sorted = faqs.slice();
+        if (config.sort === "newest") {
+          sorted.sort(function (a, b) {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+          return sorted;
+        }
+        if (config.sort === "views") {
+          sorted.sort(function (a, b) {
+            return Number(b.viewCount || 0) - Number(a.viewCount || 0);
+          });
+          return sorted;
+        }
+        sorted.sort(function (a, b) {
+          var voteDelta = Number(b.voteScore || 0) - Number(a.voteScore || 0);
+          if (voteDelta !== 0) return voteDelta;
+          return getAnswerCount(b) - getAnswerCount(a);
+        });
+        return sorted;
+      }
+
+      function buildFetchUrl() {
+        if (!config.faqUrl) return "";
+        var hasQuery = config.faqUrl.indexOf("?") !== -1;
+        var params = [];
+        if (config.product.id) params.push("productId=" + encodeURIComponent(config.product.id));
+        if (config.product.handle) params.push("productHandle=" + encodeURIComponent(config.product.handle));
+        if (config.product.title) params.push("productTitle=" + encodeURIComponent(config.product.title));
+        if (config.sort) params.push("sort=" + encodeURIComponent(config.sort));
+        if (!params.length) return config.faqUrl;
+        return config.faqUrl + (hasQuery ? "&" : "?") + params.join("&");
+      }
+
+      async function requestJson(url, options) {
+        var response;
+        try {
+          response = await fetch(url, options || {});
+        } catch (networkError) {
+          throw new Error("Network error. Check that your FAQ URL is reachable.");
+        }
+
+        var data = {};
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          data = {};
+        }
+
+        if (!response.ok) {
+          var message = typeof data.error === "string" && data.error
+            ? data.error
+            : "Request failed with status " + response.status + ".";
+          throw new Error(message);
+        }
+
+        return data;
+      }
+
+      function flashToast(message) {
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        clearTimeout(flashToast._timer);
+        flashToast._timer = setTimeout(function () {
+          toast.classList.remove("is-visible");
+        }, 2600);
+      }
+
+      function renderExtraAnswers(extraAnswers, questionId) {
+        if (!extraAnswers.length) return "";
+        var expanded = Boolean(state.expandedExtraAnswerIds[questionId]);
+        var maxInline = Math.max(1, Number(config.maxInlineAnswers || 2));
+        var visible = expanded ? extraAnswers : extraAnswers.slice(0, maxInline);
+        var hiddenCount = Math.max(0, extraAnswers.length - visible.length);
+
+        var answers = visible.map(function (answer) {
+          var byline = answer && answer.contributor && answer.contributor.name
+            ? "<span>By " + escapeHtml(answer.contributor.name) + "</span>"
+            : "";
+          var pending = answer && answer.pendingLocal ? '<span class="sfq-pending">Pending review</span>' : "";
+          return (
+            '<li class="sfq-answer-item">' +
+              '<p class="sfq-answer-text">' + nl2br(answer.answerText || "") + "</p>" +
+              '<div class="sfq-answer-meta">' + byline + pending + "</div>" +
+            "</li>"
+          );
+        }).join("");
+
+        var toggle = "";
+        if (extraAnswers.length > maxInline || expanded) {
+          toggle = (
+            '<button type="button" class="sfq-link" data-action="toggle-extra-answers" data-question-id="' + escapeHtml(questionId) + '">' +
+              (expanded ? "Hide extra answers" : hiddenCount > 0 ? "View " + hiddenCount + " more answers" : "View all answers") +
+            "</button>"
+          );
+        }
+
+        return '<ul class="sfq-answer-list">' + answers + "</ul>" + toggle;
+      }
+
+      function renderAnswerComposer(faq) {
+        var questionId = String(faq.id || "");
+        if (!questionId) return "";
+
+        if (!config.customer.loggedIn) {
+          return (
+            '<div class="sfq-composer">' +
+              '<button type="button" class="sfq-btn-secondary" data-action="go-login">Log in to contribute an answer</button>' +
+            "</div>"
+          );
+        }
+
+        var open = state.openAnswerFormId === questionId;
+        var submitting = Boolean(state.submittingAnswerByQuestion[questionId]);
+        return (
+          '<div class="sfq-composer">' +
+            '<button type="button" class="sfq-btn-secondary" data-action="toggle-answer-form" data-question-id="' + escapeHtml(questionId) + '">' +
+              (open ? "Cancel" : "Add your answer") +
+            "</button>" +
+            (open
+              ? '<form class="sfq-form" data-form="submit-answer" data-question-id="' + escapeHtml(questionId) + '">' +
+                  '<label class="sfq-label">Your answer</label>' +
+                  '<textarea class="sfq-textarea" name="answerText" maxlength="1500" required placeholder="Share a helpful answer for this product..."></textarea>' +
+                  '<button type="submit" class="sfq-btn" ' + (submitting ? "disabled" : "") + ">" + (submitting ? "Submitting..." : "Submit answer") + "</button>" +
+                "</form>"
+              : "") +
+          "</div>"
+        );
+      }
+
+      function renderQuestionItem(faq) {
+        var questionId = String(faq.id || "");
+        var split = splitAnswers(faq);
+        var answerCount = getAnswerCount(faq);
+        var pending = faq.pendingLocal ? '<span class="sfq-pending">Pending review</span>' : "";
+        var createdAt = formatDate(faq.createdAt);
+        var openAttr = state.openQuestionId === questionId ? " open" : "";
+
+        return (
+          '<details class="sfq-item" data-question-id="' + escapeHtml(questionId) + '"' + openAttr + ">" +
+            '<summary class="sfq-summary">' +
+              "<span>" + escapeHtml(faq.question || "Untitled question") + "</span>" +
+              '<span class="sfq-summary-meta"><span class="sfq-pill">' + answerCount + " " + (answerCount === 1 ? "answer" : "answers") + "</span></span>" +
+            "</summary>" +
+            '<div class="sfq-panel">' +
+              '<div class="sfq-meta-row">' + pending + (createdAt ? "<span>" + escapeHtml(createdAt) + "</span>" : "") + "</div>" +
+              (split.primary
+                ? '<h3 class="sfq-answer-heading">Top answer</h3><p class="sfq-answer-text">' + nl2br(split.primary.answerText || "") + "</p>"
+                : '<p class="sfq-status">No published answer yet. Be the first to contribute.</p>') +
+              renderExtraAnswers(split.extra, questionId) +
+              renderAnswerComposer(faq) +
+            "</div>" +
+          "</details>"
+        );
+      }
+
+      function renderAskSection() {
+        if (!config.customer.loggedIn) {
+          return (
+            '<section class="sfq-ask">' +
+              '<h3 class="sfq-ask-title">Have a question about this product?</h3>' +
+              '<p class="sfq-ask-copy">You need to log in to submit a question or answer.</p>' +
+              '<button type="button" class="sfq-btn" data-action="go-login">Log in</button>' +
+            "</section>"
+          );
+        }
+
+        var identity = config.customer.name || config.customer.email || "";
+        var copy = identity
+          ? "You are signed in as " + escapeHtml(identity) + "."
+          : "You are signed in and can submit questions.";
+
+        return (
+          '<section class="sfq-ask">' +
+            '<h3 class="sfq-ask-title">Ask a question</h3>' +
+            '<p class="sfq-ask-copy">' + copy + "</p>" +
+            '<form class="sfq-form" data-form="submit-question">' +
+              '<label class="sfq-label">Question</label>' +
+              '<textarea class="sfq-textarea" name="question" maxlength="1500" required placeholder="Ask something specific about this product..."></textarea>' +
+              '<button type="submit" class="sfq-btn" ' + (state.submittingQuestion ? "disabled" : "") + ">" + (state.submittingQuestion ? "Submitting..." : "Submit question") + "</button>" +
+            "</form>" +
+          "</section>"
+        );
+      }
+
+      function render() {
+        if (!config.faqUrl) {
+          content.innerHTML =
+            '<p class="sfq-message sfq-message--error">Webhook URL is missing. Update the <code>data-webhook-url</code> value in this HTML block.</p>';
+          return;
+        }
+
+        var noticeMarkup = state.notice ? '<p class="sfq-message">' + escapeHtml(state.notice) + "</p>" : "";
+        var errorMarkup = state.error
+          ? '<div class="sfq-error-wrap"><p class="sfq-message sfq-message--error">' + escapeHtml(state.error) + '</p><button type="button" class="sfq-btn-secondary" data-action="retry-load">Try again</button></div>'
+          : "";
+        var listMarkup = sortFaqs(state.faqs).map(renderQuestionItem).join("");
+        var loadingMarkup = "";
+        var emptyMarkup = "";
+
+        if (state.loading) {
+          loadingMarkup = (
+            '<p class="sfq-status">' + escapeHtml(config.loadingText) + "</p>" +
+            '<div class="sfq-skeleton">' +
+              '<div class="sfq-skeleton-line"></div>' +
+              '<div class="sfq-skeleton-line short"></div>' +
+              '<div class="sfq-skeleton-line"></div>' +
+              '<div class="sfq-skeleton-line short"></div>' +
+            "</div>"
+          );
+        } else if (!listMarkup) {
+          emptyMarkup = '<p class="sfq-empty">No published FAQs yet for this product.</p>';
+        }
+
+        content.innerHTML =
+          noticeMarkup +
+          errorMarkup +
+          loadingMarkup +
+          (!state.loading ? '<div class="sfq-list">' + (listMarkup || emptyMarkup) + "</div>" : "") +
+          renderAskSection();
+      }
+
+      function resolveCustomerPayload() {
+        if (!config.customer.loggedIn) return null;
+        return {
+          name: config.customer.name || undefined,
+          email: config.customer.email || undefined
+        };
+      }
+
+      async function loadFaqs() {
+        var fetchUrl = buildFetchUrl();
+        if (!fetchUrl) return;
+
+        state.loading = true;
+        state.error = "";
+        render();
+
+        try {
+          var data = await requestJson(fetchUrl, { method: "GET" });
+          state.faqs = Array.isArray(data.faqs) ? data.faqs : [];
+          if (state.faqs.length && !state.openQuestionId) {
+            state.openQuestionId = String(state.faqs[0].id || "");
+          }
+        } catch (error) {
+          state.error = error instanceof Error ? error.message : "Failed to load FAQs.";
+        } finally {
+          state.loading = false;
+          render();
+        }
+      }
+
+      async function submitQuestion(form) {
+        if (!config.customer.loggedIn) {
+          window.location.assign(config.loginUrl);
+          return;
+        }
+
+        var textarea = form.querySelector('textarea[name="question"]');
+        var questionText = textarea ? textarea.value.trim() : "";
+        if (questionText.length < 5) {
+          state.error = "Please enter at least 5 characters for your question.";
+          render();
+          return;
+        }
+
+        var tempId = "local-question-" + Date.now();
+        state.submittingQuestion = true;
+        state.error = "";
+        state.notice = "Submitting your question...";
+        state.faqs.unshift({
+          id: tempId,
+          question: questionText,
+          answer: "",
+          answers: [],
+          _count: { answers: 0 },
+          createdAt: new Date().toISOString(),
+          pendingLocal: true
+        });
+        textarea.value = "";
+        render();
+
+        var payload = {
+          question: questionText,
+          customer: resolveCustomerPayload(),
+          productId: config.product.id || undefined,
+          productHandle: config.product.handle || undefined,
+          productTitle: config.product.title || undefined
+        };
+        if (!payload.customer) delete payload.customer;
+
+        try {
+          var data = await requestJson(config.faqUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          var status = data && typeof data.status === "string" ? data.status : "pending";
+          var serverQuestionId = data && data.questionId ? String(data.questionId) : tempId;
+          if (status === "published") {
+            state.notice = "Your question was posted.";
+            state.faqs = state.faqs.filter(function (faq) { return faq.id !== tempId; });
+            await loadFaqs();
+            flashToast("Question posted.");
+            return;
+          }
+
+          state.notice = "Your question was submitted and is awaiting review.";
+          state.faqs = state.faqs.map(function (faq) {
+            if (faq.id !== tempId) return faq;
+            return {
+              id: serverQuestionId,
+              question: faq.question,
+              answer: faq.answer,
+              answers: faq.answers,
+              _count: faq._count,
+              createdAt: faq.createdAt,
+              pendingLocal: true
+            };
+          });
+          flashToast("Question submitted.");
+        } catch (error) {
+          state.faqs = state.faqs.filter(function (faq) { return faq.id !== tempId; });
+          state.error = error instanceof Error ? error.message : "Failed to submit question.";
+          state.notice = "";
+        } finally {
+          state.submittingQuestion = false;
+          render();
+        }
+      }
+
+      async function submitAnswer(form) {
+        if (!config.customer.loggedIn) {
+          window.location.assign(config.loginUrl);
+          return;
+        }
+
+        var questionId = String(form.getAttribute("data-question-id") || "");
+        var textarea = form.querySelector('textarea[name="answerText"]');
+        var answerText = textarea ? textarea.value.trim() : "";
+        if (!questionId) return;
+        if (answerText.length < 3) {
+          state.error = "Please enter at least 3 characters for your answer.";
+          render();
+          return;
+        }
+
+        var tempAnswerId = "local-answer-" + Date.now();
+        var previousFaqs = state.faqs.slice();
+        state.submittingAnswerByQuestion[questionId] = true;
+        state.error = "";
+        state.notice = "Submitting your answer...";
+        state.openAnswerFormId = "";
+        state.faqs = state.faqs.map(function (faq) {
+          if (String(faq.id) !== questionId) return faq;
+          var answers = Array.isArray(faq.answers) ? faq.answers.slice() : [];
+          answers.push({
+            id: tempAnswerId,
+            answerText: answerText,
+            contributor: { name: config.customer.name || "You" },
+            createdAt: new Date().toISOString(),
+            pendingLocal: true
+          });
+          return {
+            id: faq.id,
+            question: faq.question,
+            answer: faq.answer,
+            answers: answers,
+            _count: { answers: getAnswerCount(faq) + 1 },
+            createdAt: faq.createdAt,
+            pendingLocal: faq.pendingLocal
+          };
+        });
+        textarea.value = "";
+        render();
+
+        var payload = {
+          questionId: questionId,
+          answerText: answerText,
+          customer: resolveCustomerPayload(),
+          productId: config.product.id || undefined,
+          productHandle: config.product.handle || undefined
+        };
+        if (!payload.customer) delete payload.customer;
+
+        try {
+          var data = await requestJson(config.answerUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          var status = data && typeof data.status === "string" ? data.status : "pending";
+          if (status === "published") {
+            state.notice = "Your answer was posted.";
+            await loadFaqs();
+            flashToast("Answer posted.");
+            return;
+          }
+
+          state.notice = "Your answer was submitted and is awaiting review.";
+          flashToast("Answer submitted.");
+        } catch (error) {
+          state.faqs = previousFaqs;
+          state.error = error instanceof Error ? error.message : "Failed to submit answer.";
+          state.notice = "";
+        } finally {
+          delete state.submittingAnswerByQuestion[questionId];
+          render();
+        }
+      }
+
+      root.addEventListener("click", function (event) {
+        var target = event.target;
+        if (!(target instanceof Element)) return;
+        var actionButton = target.closest("[data-action]");
+        if (!actionButton) return;
+        var action = actionButton.getAttribute("data-action");
+
+        if (action === "go-login") {
+          event.preventDefault();
+          window.location.assign(config.loginUrl);
+          return;
+        }
+
+        if (action === "retry-load") {
+          event.preventDefault();
+          void loadFaqs();
+          return;
+        }
+
+        if (action === "toggle-extra-answers") {
+          event.preventDefault();
+          var questionId = String(actionButton.getAttribute("data-question-id") || "");
+          if (!questionId) return;
+          state.expandedExtraAnswerIds[questionId] = !state.expandedExtraAnswerIds[questionId];
+          render();
+          return;
+        }
+
+        if (action === "toggle-answer-form") {
+          event.preventDefault();
+          var qid = String(actionButton.getAttribute("data-question-id") || "");
+          state.openAnswerFormId = state.openAnswerFormId === qid ? "" : qid;
+          render();
+        }
+      });
+
+      root.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        var formType = form.getAttribute("data-form");
+        if (!formType) return;
+        event.preventDefault();
+
+        if (formType === "submit-question") {
+          void submitQuestion(form);
+          return;
+        }
+
+        if (formType === "submit-answer") {
+          void submitAnswer(form);
+        }
+      });
+
+      root.addEventListener(
+        "toggle",
+        function (event) {
+          var target = event.target;
+          if (!(target instanceof HTMLDetailsElement)) return;
+          if (!target.classList.contains("sfq-item") || !target.open) return;
+
+          state.openQuestionId = String(target.getAttribute("data-question-id") || "");
+          var openDetails = root.querySelectorAll("details.sfq-item[open]");
+          for (var i = 0; i < openDetails.length; i += 1) {
+            if (openDetails[i] !== target) openDetails[i].open = false;
+          }
+        },
+        true
+      );
+
+      render();
+      void loadFaqs();
+    })();
+  </script>
+</div>
