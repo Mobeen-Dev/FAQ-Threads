@@ -27,7 +27,11 @@ PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
 
 1. Configure a Linux self-hosted GitHub Actions runner for this repository.
 2. Install Docker and Docker Compose plugin on the runner host.
-3. Add GitHub repository secrets:
+3. Ensure the runner user can run Docker non-interactively:
+   - Preferred: add runner user to `docker` group (`sudo usermod -aG docker <runner-user>`), then restart runner host/session.
+   - Alternative: passwordless sudo for Docker (`<runner-user> ALL=(ALL) NOPASSWD:/usr/bin/docker`).
+   - If neither is configured, deployment fails because GitHub Actions cannot enter a sudo password.
+4. Add GitHub repository secrets:
    - `POSTGRES_USER`
    - `POSTGRES_PASSWORD`
    - `POSTGRES_DB`
@@ -41,7 +45,7 @@ Set `FRONTEND_URL` to the exact browser origin (example: `http://92.222.229.140:
 Admin API traffic is forced to internal routing:
 - browser uses `NEXT_PUBLIC_API_URL=/api`
 - frontend container proxies `/api/*` to `INTERNAL_API_URL=http://backend:4004/api`
-4. Keep `deploy/.env.production.example` as the reference template.
+5. Keep `deploy/.env.production.example` as the reference template.
 
 ## Branch strategy
 

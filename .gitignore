@@ -31,6 +31,8 @@ Thumbs.db
 logs
 *.log
 chat.md
+chat.md
+ui-extension/chat.txt
 
 # Database
 *.db

@@ -53,13 +53,36 @@ jobs:
           EOF
           echo "✅ deploy/.env.production generated from secrets"
 
+      - name: 🐳 Resolve Docker Compose command
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if docker info > /dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=docker compose" >> "$GITHUB_ENV"
+            echo "✅ Using docker compose without sudo"
+            exit 0
+          fi
+
+          if sudo -n docker info > /dev/null 2>&1; then
+            echo "DOCKER_COMPOSE=sudo -n docker compose" >> "$GITHUB_ENV"
+            echo "✅ Using docker compose with passwordless sudo"
+            exit 0
+          fi
+
+          echo "❌ Docker is not accessible for the runner user."
+          echo "Fix one of these on the self-hosted runner:"
+          echo "1) Add runner user to the docker group and restart runner."
+          echo "2) Allow passwordless sudo for /usr/bin/docker."
+          exit 1
+
       - name: 🛑 Stop existing services
         run: |
-          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml down --remove-orphans || true
+          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml down --remove-orphans || true
 
       - name: 🏗️ Build and start services
         run: |
-          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
+          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
 
       - name: ⏱️ Wait for startup
         run: |
@@ -93,9 +116,9 @@ jobs:
 
       - name: ✅ Deployment status
         run: |
-          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
+          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
 
       - name: 📋 Dump logs on failure
         if: failure()
         run: |
-          sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml logs --tail=200 || true
+          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml logs --tail=200 || true
