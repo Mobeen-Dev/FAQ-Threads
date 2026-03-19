@@ -2,6 +2,15 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { resolveApiBase } from "@/services/apiBase";
+import {
+  clearAuthState,
+  getBearerAuthHeader,
+  getCachedUser,
+  getStoredToken,
+  isTokenUsable,
+  setCachedUser,
+  setStoredToken,
+} from "@/services/authStorage";
 
 interface User {
   id: string;
@@ -23,7 +32,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = resolveApiBase();
-const USER_CACHE_KEY = "auth_user_cache:v1";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -31,17 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const cachedUserRaw = typeof window !== "undefined" ? localStorage.getItem(USER_CACHE_KEY) : null;
-    let cachedUser: User | null = null;
-    if (cachedUserRaw) {
-      try {
-        cachedUser = JSON.parse(cachedUserRaw) as User;
-      } catch {
-        cachedUser = null;
-      }
-    }
-    if (!stored) {
+    const stored = getStoredToken();
+    const cachedUser = getCachedUser<User>();
+
+    if (!stored || !isTokenUsable(stored)) {
+      clearAuthState();
+      setUser(null);
+      setToken(null);
       setLoading(false);
       return;
     }
@@ -55,19 +59,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${stored}` },
+        method: "GET",
+        credentials: "same-origin",
+        headers: { ...getBearerAuthHeader(stored) },
       });
-      if (!res.ok) throw new Error("Invalid token");
+      if (res.status === 401) {
+        clearAuthState();
+        setUser(null);
+        setToken(null);
+        throw new Error("Session expired. Please sign in again.");
+      }
+      if (!res.ok) throw new Error("Unable to validate your session.");
       const data = await res.json();
       setUser(data.user);
       setToken(stored);
-      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
-    } catch {
-      if (cachedUser) {
+      setCachedUser(data.user);
+    } catch (error) {
+      if (cachedUser && isTokenUsable(stored) && typeof navigator !== "undefined" && navigator.onLine === false) {
         setUser(cachedUser);
         setToken(stored);
       } else {
-        localStorage.removeItem("token");
+        if (error instanceof Error) {
+          console.warn("Auth refresh failed", error);
+        }
+        clearAuthState();
         setUser(null);
         setToken(null);
       }
@@ -83,13 +98,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({ error: "Login failed" }));
     if (!res.ok) throw new Error(data.error || "Login failed");
-    localStorage.setItem("token", data.token);
-    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
+    if (!data.token || !isTokenUsable(data.token)) {
+      throw new Error("Received invalid login session.");
+    }
+    setStoredToken(data.token);
+    setCachedUser(data.user);
     setToken(data.token);
     setUser(data.user);
   };
@@ -97,20 +116,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (email: string, password: string, name: string) => {
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({ error: "Signup failed" }));
     if (!res.ok) throw new Error(data.error || "Signup failed");
-    localStorage.setItem("token", data.token);
-    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data.user));
+    if (!data.token || !isTokenUsable(data.token)) {
+      throw new Error("Received invalid signup session.");
+    }
+    setStoredToken(data.token);
+    setCachedUser(data.user);
     setToken(data.token);
     setUser(data.user);
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem(USER_CACHE_KEY);
+    clearAuthState();
     setToken(null);
     setUser(null);
   };

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { isValidEmail, normalizeEmail } from "@/services/authStorage";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -18,7 +19,15 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      const normalizedEmail = normalizeEmail(email).toLowerCase();
+      if (!isValidEmail(normalizedEmail)) {
+        throw new Error("Please enter a valid email address.");
+      }
+      if (!password.trim()) {
+        throw new Error("Password is required.");
+      }
+
+      await login(normalizedEmail, password);
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

@@ -1,16 +1,17 @@
 import { resolveApiBase } from "@/services/apiBase";
+import {
+  clearAuthState,
+  getBearerAuthHeader,
+  getStoredToken,
+  isTokenUsable,
+} from "@/services/authStorage";
 
 const API_BASE = resolveApiBase();
 const CACHE_PREFIX = "faq-api-cache:v1:";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("token");
-}
-
 function getCacheKey(endpoint: string, token: string | null) {
-  const tokenScope = token ? token.slice(-12) : "anon";
+  const tokenScope = token ? "auth" : "anon";
   return `${CACHE_PREFIX}${tokenScope}:${endpoint}`;
 }
 
@@ -38,7 +39,11 @@ function writeCached<T>(cacheKey: string, data: T) {
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+  const storedToken = getStoredToken();
+  const token = storedToken && isTokenUsable(storedToken) ? storedToken : null;
+  if (storedToken && !token) {
+    clearAuthState();
+  }
   const method = (options.method || "GET").toUpperCase();
   const cacheKey = method === "GET" ? getCacheKey(endpoint, token) : null;
   const cached = cacheKey ? readCached<T>(cacheKey) : null;
@@ -49,7 +54,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...getBearerAuthHeader(token),
     ...(options.headers as Record<string, string>),
   };
 
@@ -57,11 +62,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   try {
     response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
+      credentials: "same-origin",
       headers,
     });
   } catch (err) {
     if (cached) return cached;
     throw err;
+  }
+
+  if (response.status === 401) {
+    clearAuthState();
+    throw new Error("Session expired. Please sign in again.");
   }
 
   if (!response.ok) {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { isStrongPassword, isValidEmail, normalizeEmail } from "@/services/authStorage";
 
 export default function SignupPage() {
   const { signup } = useAuth();
@@ -19,7 +20,20 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      await signup(email, password, name);
+      const trimmedName = name.trim();
+      const normalizedEmail = normalizeEmail(email).toLowerCase();
+
+      if (!trimmedName) {
+        throw new Error("Name is required.");
+      }
+      if (!isValidEmail(normalizedEmail)) {
+        throw new Error("Please enter a valid email address.");
+      }
+      if (!isStrongPassword(password)) {
+        throw new Error("Password must be at least 8 characters and include upper, lower, number, and symbol.");
+      }
+
+      await signup(normalizedEmail, password, trimmedName);
       router.push("/credentials");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -81,7 +95,7 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
               placeholder="Min 6 characters"
-              minLength={6}
+              minLength={8}
               required
             />
           </div>
