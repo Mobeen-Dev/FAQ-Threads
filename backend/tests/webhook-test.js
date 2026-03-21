@@ -211,9 +211,12 @@ async function testSaveCredentials(token) {
     Authorization: `Bearer ${token}`,
   });
   assert(res.status === 200 || res.status === 201, "Credentials saved", `status=${res.status}`);
-  assert(res.body.webhookUrl, "Returns webhook URL");
-  console.log(`  📌 Webhook URL: ${res.body.webhookUrl}`);
-  return res.body.webhookUrl;
+  assert(res.body.widgetHtml, "Returns widget HTML");
+  const match = String(res.body.widgetHtml || "").match(/data-webhook-url="([^"]+)"/i);
+  const webhookUrl = match ? match[1] : "";
+  assert(!!webhookUrl, "Widget HTML includes data-webhook-url");
+  console.log(`  📌 Webhook URL (from widgetHtml): ${webhookUrl}`);
+  return webhookUrl;
 }
 
 async function testGetCredentials(token) {
@@ -223,7 +226,8 @@ async function testGetCredentials(token) {
   });
   assert(res.status === 200, "GET credentials returns 200", `status=${res.status}`);
   assert(res.body.shop?.domain === TEST_SHOP.domain, "Shop domain matches");
-  assert(res.body.webhookUrl, "Webhook URL present in response");
+  assert(res.body.widgetHtml, "Widget HTML present in response");
+  assert(/data-webhook-url="https?:\/\/[^"]+\/api\/webhooks\/[^/]+\/faq"/i.test(String(res.body.widgetHtml || "")), "Widget HTML has valid webhook URL");
 }
 
 async function testWebhookPostWithCustomer(webhookPath) {

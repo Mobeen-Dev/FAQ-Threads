@@ -14,7 +14,7 @@ export default function CredentialsPage() {
   const [apiKey, setApiKey] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [storeName, setStoreName] = useState("");
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [widgetHtml, setWidgetHtml] = useState("");
   const [hasExisting, setHasExisting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export default function CredentialsPage() {
         setStoreName(data.shop.name || "");
         setHasExisting(true);
       }
-      setWebhookUrl(data.webhookUrl);
+      setWidgetHtml(data.widgetHtml || "");
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user, authLoading, router]);
@@ -50,7 +50,7 @@ export default function CredentialsPage() {
         accessToken: accessToken || undefined,
         name: storeName || undefined,
       });
-      setWebhookUrl(data.webhookUrl);
+      setWidgetHtml(data.widgetHtml || "");
       setHasExisting(true);
       setAccessToken("");
       setSuccess("Credentials saved successfully!");
@@ -62,8 +62,8 @@ export default function CredentialsPage() {
     }
   };
 
-  const copyWebhookUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
+  const copyWidgetHtml = () => {
+    navigator.clipboard.writeText(widgetHtml);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -80,26 +80,28 @@ export default function CredentialsPage() {
     <div>
       <h1 className="text-2xl font-bold text-stone-900 dark:text-zinc-100 mb-6">Shopify Credentials</h1>
 
-      {/* Webhook URL Card */}
-      {webhookUrl && (
+      {/* Widget HTML Card */}
+      {widgetHtml && (
         <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-2xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-teal-900 dark:text-teal-100 mb-2 inline-flex items-center gap-2">
             <MaterialIcon name="rss_feed" className="text-lg" />
-            Your Webhook URL
+            Your Widget HTML
           </h2>
           <p className="text-sm text-teal-700 dark:text-teal-300 mb-3">
-            Paste this URL in your Shopify app or Chrome extension. It accepts POST and PUT requests.
+            Copy and paste this HTML block into your Shopify theme to embed the FAQ widget.
           </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 bg-white dark:bg-zinc-800 border border-teal-300 dark:border-teal-700 rounded-xl px-4 py-2.5 text-sm font-mono text-teal-900 dark:text-teal-100 break-all">
-              {webhookUrl}
-            </code>
-            <button
-              onClick={copyWebhookUrl}
-              className="bg-teal-600 text-white px-4 py-2.5 rounded-xl hover:bg-teal-700 transition-colors text-sm whitespace-nowrap font-medium"
-            >
-              {copied ? "Copied!" : "Copy"}
-            </button>
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <button
+                onClick={copyWidgetHtml}
+                className="bg-teal-600 text-white px-4 py-2.5 rounded-xl hover:bg-teal-700 transition-colors text-sm whitespace-nowrap font-medium"
+              >
+                {copied ? "Copied!" : "Copy HTML"}
+              </button>
+            </div>
+            <pre className="bg-white dark:bg-zinc-800 border border-teal-300 dark:border-teal-700 rounded-xl px-4 py-3 text-xs font-mono text-teal-900 dark:text-teal-100 whitespace-pre-wrap break-all max-h-80 overflow-auto">
+              {widgetHtml}
+            </pre>
           </div>
         </div>
       )}

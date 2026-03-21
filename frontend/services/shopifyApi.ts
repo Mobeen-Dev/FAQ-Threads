@@ -200,7 +200,7 @@ export interface ShopCredentials {
     accessToken: string | null;
     name: string | null;
   } | null;
-  webhookUrl: string;
+  widgetHtml: string;
 }
 
 export const shopifyApi = {

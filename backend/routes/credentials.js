@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const router = express.Router();
 const prisma = require("../services/prismaClient");
 const authMiddleware = require("../middleware/auth");
+const { buildWidgetHtml } = require("../services/widgetEmbedService");
 
 router.use(authMiddleware);
 
@@ -77,6 +78,23 @@ async function buildShopWebhookUrl(req, shop) {
   return buildWebhookUrl(req, identifier);
 }
 
+function toShopPayload(shop) {
+  return {
+    id: shop.id,
+    domain: shop.domain,
+    apiKey: shop.apiKey,
+    accessToken: shop.accessToken ? "••••••" + shop.accessToken.slice(-4) : null,
+    name: shop.name,
+  };
+}
+
+function buildCredentialsResponse(shop, widgetHtml) {
+  return {
+    shop: shop ? toShopPayload(shop) : null,
+    widgetHtml,
+  };
+}
+
 // Get user's Shopify credentials
 router.get("/", async (req, res, next) => {
   try {
@@ -85,19 +103,12 @@ router.get("/", async (req, res, next) => {
     });
 
     if (!shop) {
-      return res.json({ shop: null });
+      return res.json({ shop: null, widgetHtml: "" });
     }
 
-    res.json({
-      shop: {
-        id: shop.id,
-        domain: shop.domain,
-        apiKey: shop.apiKey,
-        accessToken: shop.accessToken ? "••••••" + shop.accessToken.slice(-4) : null,
-        name: shop.name,
-      },
-      webhookUrl: await buildShopWebhookUrl(req, shop),
-    });
+    const webhookUrl = await buildShopWebhookUrl(req, shop);
+    const widgetHtml = buildWidgetHtml(webhookUrl);
+    res.json(buildCredentialsResponse(shop, widgetHtml));
   } catch (error) {
     next(error);
   }
@@ -132,16 +143,9 @@ router.post("/", async (req, res, next) => {
       },
     });
 
-    res.json({
-      shop: {
-        id: shop.id,
-        domain: shop.domain,
-        apiKey: shop.apiKey,
-        accessToken: shop.accessToken ? "••••••" + shop.accessToken.slice(-4) : null,
-        name: shop.name,
-      },
-      webhookUrl: await buildShopWebhookUrl(req, shop),
-    });
+    const webhookUrl = await buildShopWebhookUrl(req, shop);
+    const widgetHtml = buildWidgetHtml(webhookUrl);
+    res.json(buildCredentialsResponse(shop, widgetHtml));
   } catch (error) {
     next(error);
   }

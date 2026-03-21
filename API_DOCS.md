@@ -458,7 +458,7 @@ Update an existing question (typically used by the question author).
 
 #### GET `/api/credentials`
 
-Get the current user's shop credentials and webhook URL.
+Get the current user's shop credentials and ready-to-paste widget embed HTML.
 
 **Response `200`:**
 ```json
@@ -470,11 +470,13 @@ Get the current user's shop credentials and webhook URL.
     "accessToken": "••••••ef01",
     "name": "My Store"
   },
-  "webhookUrl": "https://api.example.com/api/webhooks/cm1user123/faq"
+  "widgetHtml": "<div class=\"sfq-block\" data-sfq-block data-webhook-url=\"https://api.example.com/api/webhooks/whk_xxx/faq\">...</div>"
 }
 ```
 
 > **Note:** `accessToken` is masked — only last 4 characters shown.
+>
+> **Widget HTML:** Contains the storefront FAQ widget markup with a dynamically injected `data-webhook-url`.
 >
 > **Webhook URL base resolution:** `PUBLIC_BACKEND_URL` (preferred) → `BACKEND_URL` (if public) → proxy headers (`X-Forwarded-Host` / `X-Forwarded-Proto`) → localhost fallback.
 
@@ -482,7 +484,7 @@ Get the current user's shop credentials and webhook URL.
 ```json
 {
   "shop": null,
-  "webhookUrl": "https://api.example.com/api/webhooks/cm1user123/faq"
+  "widgetHtml": ""
 }
 ```
 
