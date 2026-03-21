@@ -1,13 +1,21 @@
-sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
+#!/usr/bin/env bash
 
- 
-● Perfect — next steps:
+# 1) Runner Docker access diagnostics
+chmod +x deploy/runner-diagnostics.sh
+./deploy/runner-diagnostics.sh | tee deploy/runner-diagnostics.out
 
-   1. Verify containers:
+# 2) If runner was just added to docker group, restart the runner service
+sudo systemctl restart actions.runner.<owner>-<repo>.<runner-name>.service
+systemctl status actions.runner.<owner>-<repo>.<runner-name>.service --no-pager
+pid=$(pgrep -f "Runner.Listener run --startuptype service" | head -n1)
+cat /proc/$pid/status | grep ^Groups:
 
-   sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
+# 3) Deploy
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
 
-   1. Check health:
+# 4) Verify running services
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
 
-   curl http://localhost:4004/health
-   curl http://localhost:3004/login
+# 5) Check app health
+curl -fsS http://localhost:4004/health
+curl -fsS http://localhost:3004/login

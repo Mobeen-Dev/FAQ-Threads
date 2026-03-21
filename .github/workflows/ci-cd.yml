@@ -58,6 +58,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "🔎 Runner diagnostics (non-sensitive)"
+          whoami || true
+          id || true
+          groups || true
+          ls -l /var/run/docker.sock || true
+          docker --version || true
+          docker compose version || true
+
           if docker info > /dev/null 2>&1; then
             echo "DOCKER_COMPOSE=docker compose" >> "$GITHUB_ENV"
             echo "✅ Using docker compose without sudo"

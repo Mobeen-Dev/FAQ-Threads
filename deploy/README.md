@@ -17,7 +17,8 @@ When code is pushed to `deploy`:
 1. Generates `deploy/.env.production` from GitHub Secrets.
 2. Stops existing containers for `deploy/docker-compose.deploy.yml`.
 3. Runs:
-   - `sudo docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
+   - `docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
+   - fallback if required by runner policy: `sudo -n docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
 4. Checks backend (`/health`) and frontend (`/login`) locally.
 5. Prints compose logs on failure.
 
@@ -46,6 +47,42 @@ Admin API traffic is forced to internal routing:
 - browser uses `NEXT_PUBLIC_API_URL=/api`
 - frontend container proxies `/api/*` to `INTERNAL_API_URL=http://backend:4004/api`
 5. Keep `deploy/.env.production.example` as the reference template.
+
+## Runner Docker access verification and recovery
+
+Use the included diagnostics script:
+
+```bash
+chmod +x deploy/runner-diagnostics.sh
+./deploy/runner-diagnostics.sh | tee deploy/runner-diagnostics.out
+```
+
+Expected healthy state:
+
+- `docker_direct_ok=yes` (preferred)
+- Runner user is listed in `docker` group
+- `/var/run/docker.sock` is owned by `root:docker` with group read/write
+
+If the user was recently added to `docker` group, restart the runner service so the service process picks up updated groups:
+
+```bash
+sudo systemctl restart actions.runner.<owner>-<repo>.<runner-name>.service
+systemctl status actions.runner.<owner>-<repo>.<runner-name>.service --no-pager
+pid=$(pgrep -f "Runner.Listener run --startuptype service" | head -n1)
+cat /proc/$pid/status | grep ^Groups:
+```
+
+Confirm docker GID appears in the runner process groups.
+
+If group-based access is disallowed by policy, configure a tightly scoped sudoers fallback:
+
+```bash
+echo "<runner-user> ALL=(ALL) NOPASSWD:/usr/bin/docker" | sudo tee /etc/sudoers.d/runner-docker
+sudo chmod 440 /etc/sudoers.d/runner-docker
+sudo visudo -cf /etc/sudoers.d/runner-docker
+```
+
+Never use broad sudoers grants like `NOPASSWD: ALL`.
 
 ## Branch strategy
 
