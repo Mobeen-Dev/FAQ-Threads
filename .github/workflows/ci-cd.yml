@@ -41,8 +41,23 @@ jobs:
           if [ -z "$ALLOWED_ORIGINS" ]; then
             ALLOWED_ORIGINS="$FRONTEND_URL"
           fi
-          DB_APP_USER="${DB_APP_USER:-$POSTGRES_USER}"
-          DB_APP_PASSWORD="${DB_APP_PASSWORD:-$POSTGRES_PASSWORD}"
+          if [ -n "${DB_APP_USER:-}" ] || [ -n "${DB_APP_PASSWORD:-}" ]; then
+            if [ -z "${DB_APP_USER:-}" ] || [ -z "${DB_APP_PASSWORD:-}" ]; then
+              echo "❌ DB app credentials must be configured as a pair."
+              echo "Set both DB_APP_USER and DB_APP_PASSWORD, or leave both unset."
+              exit 1
+            fi
+          else
+            DB_APP_USER="$POSTGRES_USER"
+            DB_APP_PASSWORD="$POSTGRES_PASSWORD"
+          fi
+
+          if [ "$DB_APP_USER" = "$POSTGRES_USER" ] && [ "$DB_APP_PASSWORD" != "$POSTGRES_PASSWORD" ]; then
+            echo "❌ DB_APP_USER resolves to POSTGRES_USER but passwords differ."
+            echo "Use POSTGRES_PASSWORD for postgres user, or set a dedicated DB_APP_USER."
+            exit 1
+          fi
+
           DB_APP_USER_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_USER")"
           DB_APP_PASSWORD_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_PASSWORD")"
           DATABASE_URL="postgresql://${DB_APP_USER_ENC}:${DB_APP_PASSWORD_ENC}@postgres:5432/${POSTGRES_DB}"

@@ -36,8 +36,8 @@ PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
    - `POSTGRES_USER`
    - `POSTGRES_PASSWORD`
    - `POSTGRES_DB`
-   - `DB_APP_USER` (recommended; defaults to `POSTGRES_USER` if omitted)
-   - `DB_APP_PASSWORD` (recommended; defaults to `POSTGRES_PASSWORD` if omitted)
+   - `DB_APP_USER` (optional, but must be paired with `DB_APP_PASSWORD`)
+   - `DB_APP_PASSWORD` (optional, but must be paired with `DB_APP_USER`)
    - `FRONTEND_URL`
    - `BACKEND_URL`
    - `JWT_SECRET`
@@ -78,7 +78,10 @@ Then set secrets:
 - `DB_APP_USER=faq_app_user`
 - `DB_APP_PASSWORD=<strong-random-password>`
 
-The workflow generates `DATABASE_URL` from app credentials (falls back to `POSTGRES_*` for backward compatibility).
+The workflow generates `DATABASE_URL` from app credentials.
+- If both `DB_APP_USER` and `DB_APP_PASSWORD` are set, those are used.
+- If neither is set, it falls back to `POSTGRES_USER` + `POSTGRES_PASSWORD`.
+- If only one is set, deployment fails fast with a clear error.
 Credential values are URL-encoded when building `DATABASE_URL` to avoid auth failures when passwords contain reserved URL characters.
 
 ### Safe password rotation order
