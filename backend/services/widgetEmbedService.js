@@ -4,9 +4,7 @@ const path = require("path");
 const WIDGET_TEMPLATE_PATH = path.resolve(
   __dirname,
   "..",
-  "..",
-  "ui-extension",
-  "v1",
+  "templates",
   "faq-widget-v1-standalone-mock.html"
 );
 

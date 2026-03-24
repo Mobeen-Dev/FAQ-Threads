@@ -33,7 +33,7 @@ logs
 chat.md
 chat.md
 ui-extension/chat.txt
-
+deploy/.env.production
 # Database
 *.db
 *.sqlite
