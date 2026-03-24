@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QuestionForm from "@/components/QuestionForm";
 import QuestionTable from "@/components/QuestionTable";
+import AssociatedProductCard from "@/components/AssociatedProductCard";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,13 +16,6 @@ export default function QuestionsPage() {
   const searchParams = useSearchParams();
 
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<{
-    question: string;
-    answer: string;
-    categoryId?: string;
-    status?: string;
-  } | null>(null);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [saving, setSaving] = useState(false);
@@ -76,41 +70,10 @@ export default function QuestionsPage() {
     }
   };
 
-  const handleUpdate = async (data: { question: string; answer: string; categoryId?: string; status?: string }) => {
-    if (!editingId) return;
-    setSaving(true);
-    try {
-      await shopifyApi.updateQuestion(editingId, data);
-      setShowForm(false);
-      setEditingId(null);
-      setEditingData(null);
-      refetch();
-      if (openQuestionId === editingId) {
-        await handleOpenQuestion(editingId);
-      }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update question");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEdit = async (id: string) => {
-    try {
-      const { question } = await shopifyApi.getQuestion(id);
-      setEditingData({
-        question: question.question,
-        answer: question.answer,
-        categoryId: question.categoryId || undefined,
-        status: question.status,
-      });
-      setEditingId(id);
-      setShowForm(true);
-      setOpenQuestionId(null);
-      setOpenQuestion(null);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to load question");
-    }
+  const handleEdit = (id: string) => {
+    router.push(`/questions/${id}`);
+    setOpenQuestionId(null);
+    setOpenQuestion(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -166,15 +129,11 @@ export default function QuestionsPage() {
   };
 
   const openNewForm = () => {
-    setEditingId(null);
-    setEditingData(null);
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
-    setEditingId(null);
-    setEditingData(null);
   };
 
   return (
@@ -192,17 +151,15 @@ export default function QuestionsPage() {
       {showForm && (
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4 text-stone-900 dark:text-zinc-100">
-            {editingId ? "Edit Question" : "New Question"}
+            New Question
           </h2>
           <QuestionForm
-            key={editingId || "new"}
-            initialData={editingData || undefined}
+            key="new"
             categories={categories}
-            onSubmit={editingId ? handleUpdate : handleCreate}
+            onSubmit={handleCreate}
             onCancel={closeForm}
             onCreateCategory={handleCreateCategory}
             loading={saving}
-            isEditing={!!editingId}
           />
         </div>
       )}
@@ -294,6 +251,17 @@ export default function QuestionsPage() {
                     <p className="text-sm text-stone-600 dark:text-zinc-400 mb-1">Answer</p>
                     <p className="text-stone-900 dark:text-zinc-100 whitespace-pre-wrap">{openQuestion.answer || "No answer yet"}</p>
                   </div>
+
+                  {(openQuestion.product || openQuestion.productTitle || openQuestion.productHandle) && (
+                    <div className="bg-stone-50 dark:bg-zinc-800/50 rounded-2xl p-4">
+                      <p className="text-sm text-stone-600 dark:text-zinc-400 mb-2">Associated Product</p>
+                      <AssociatedProductCard
+                        product={openQuestion.product}
+                        productTitle={openQuestion.productTitle}
+                        productHandle={openQuestion.productHandle}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <select

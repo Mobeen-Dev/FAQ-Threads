@@ -30,6 +30,7 @@ model Shop {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   categories        Category[]
   questions         Question[]
+  products          Product[]
   answers           Answer[]
   votes             Vote[]
   contributors      StoreContributor[]
@@ -38,6 +39,25 @@ model Shop {
   updatedAt         DateTime           @updatedAt
 
   @@unique([userId, domain])
+}
+
+model Product {
+  id                String    @id @default(cuid())
+  title             String
+  firstImageUrl     String?   @map("first_image_url")
+  frontendUrl       String    @map("frontend_url")
+  externalProductId String?   @map("external_product_id")
+  handle            String?
+  sourceUrl         String?   @map("source_url")
+  shopId            String
+  shop              Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  questions         Question[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([shopId, frontendUrl])
+  @@index([shopId, handle])
+  @@index([shopId, externalProductId])
 }
 
 // ─── FAQ Categories ─────────────────────────────────────────
@@ -70,6 +90,8 @@ model Question {
   productId     String?
   productHandle String?
   productTitle  String?
+  productRefId  String?   @map("product_id")
+  product       Product?  @relation(fields: [productRefId], references: [id], onDelete: SetNull)
   customerName  String?
   customerEmail String?
   customerPhone String?
@@ -93,6 +115,7 @@ model Question {
   @@index([shopId, categoryId])
   @@index([shopId, voteScore])
   @@index([customerEmail])
+  @@index([productRefId])
 }
 
 // ─── Answers (multiple per question) ────────────────────────

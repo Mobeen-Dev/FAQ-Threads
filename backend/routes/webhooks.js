@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require("../services/prismaClient");
 const contributorService = require("../services/contributorService");
 const settingsService = require("../services/settingsService");
+const productService = require("../services/productService");
 
 async function findShopByWebhookIdentifier(identifier) {
   return prisma.shop.findFirst({
@@ -47,6 +48,15 @@ router.post("/:identifier/faq", async (req, res) => {
 
     // Determine status via publishing rules
     const status = await settingsService.resolveQuestionStatus(shop.id, contributor?.id);
+    const resolvedProductHandle = payload.productHandle
+      ? String(payload.productHandle)
+      : productService.extractHandleFromUrl(payload.productUrl ? String(payload.productUrl) : null);
+    let linkedProduct = null;
+    try {
+      linkedProduct = await productService.upsertProductFromQuestionPayload({ shop, payload });
+    } catch (productError) {
+      console.error("Product linking failed during webhook POST:", productError);
+    }
 
     const question = await prisma.question.create({
       data: {
@@ -55,8 +65,9 @@ router.post("/:identifier/faq", async (req, res) => {
         status,
         source: "webhook",
         productId: payload.productId ? String(payload.productId) : null,
-        productHandle: payload.productHandle ? String(payload.productHandle) : null,
-        productTitle: payload.productTitle ? String(payload.productTitle) : null,
+        productHandle: resolvedProductHandle || null,
+        productTitle: payload.productTitle ? String(payload.productTitle) : (linkedProduct?.title || null),
+        productRefId: linkedProduct?.id || null,
         customerName: customer.name || payload.customerName || null,
         customerEmail,
         customerPhone: customer.phone || payload.customerPhone || null,
@@ -193,9 +204,17 @@ router.put("/:identifier/faq", async (req, res) => {
     if (payload.question) updateData.question = payload.question;
     if (payload.answer !== undefined) updateData.answer = payload.answer;
     if (payload.status) updateData.status = payload.status;
-    if (payload.productId !== undefined) updateData.productId = payload.productId ? String(payload.productId) : null;
-    if (payload.productHandle !== undefined) updateData.productHandle = payload.productHandle ? String(payload.productHandle) : null;
-    if (payload.productTitle !== undefined) updateData.productTitle = payload.productTitle ? String(payload.productTitle) : null;
+    if (
+      payload.productId !== undefined ||
+      payload.productHandle !== undefined ||
+      payload.productTitle !== undefined ||
+      payload.productUrl !== undefined
+    ) {
+      console.warn("Webhook PUT ignored product mutation because product linkage is immutable.", {
+        questionId: payload.id,
+        shopId: shop.id,
+      });
+    }
     if (customer.name || payload.customerName) updateData.customerName = customer.name || payload.customerName;
     if (customer.email || payload.customerEmail) updateData.customerEmail = customer.email || payload.customerEmail;
     if (customer.phone || payload.customerPhone) updateData.customerPhone = customer.phone || payload.customerPhone;
@@ -204,7 +223,7 @@ router.put("/:identifier/faq", async (req, res) => {
     const updated = await prisma.question.update({
       where: { id: payload.id },
       data: updateData,
-      include: { category: true },
+      include: { category: true, product: true },
     });
 
     res.json({ success: true, question: updated });

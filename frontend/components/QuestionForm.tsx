@@ -158,6 +158,7 @@ export default function QuestionForm({
             <option value="published">Published</option>
             <option value="rejected">Rejected</option>
             <option value="draft">Draft</option>
+            <option value="suspended">Suspended</option>
           </select>
         </div>
       )}

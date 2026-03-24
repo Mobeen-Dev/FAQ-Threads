@@ -372,6 +372,7 @@
           : null;
         var inferredHandleMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
         var inferredProductHandle = inferredHandleMatch ? decodeURIComponent(inferredHandleMatch[1]) : "";
+        var inferredProductUrl = inferredProductHandle ? (window.location.origin + "/products/" + encodeURIComponent(inferredProductHandle)) : "";
         var inferredProductTitle = document.title ? document.title.replace(/\s*\|\s*.+$/, "").trim() : "";
         var inferredCustomerId = storefrontPage && (storefrontPage.customerId || storefrontPage.customer_id)
           ? String(storefrontPage.customerId || storefrontPage.customer_id)
@@ -386,7 +387,8 @@
           product: {
             id: storefrontPage && storefrontPage.resourceId ? String(storefrontPage.resourceId) : "",
             handle: inferredProductHandle,
-            title: inferredProductTitle
+            title: inferredProductTitle,
+            url: inferredProductUrl
           },
           customer: {
             loggedIn: Boolean(inferredCustomerId),
@@ -740,7 +742,8 @@
           customer: resolveCustomerPayload(),
           productId: config.product.id || undefined,
           productHandle: config.product.handle || undefined,
-          productTitle: config.product.title || undefined
+          productTitle: config.product.title || undefined,
+          productUrl: config.product.url || undefined
         };
         if (!payload.customer) delete payload.customer;
 

@@ -586,6 +586,7 @@
       productId: instance.config.product.id || undefined,
       productHandle: instance.config.product.handle || undefined,
       productTitle: instance.config.product.title || undefined,
+      productUrl: instance.config.product.url || undefined,
     };
 
     if (!payload.customer) delete payload.customer;
@@ -844,6 +845,7 @@
         id: root.dataset.productId || "",
         handle: root.dataset.productHandle || "",
         title: root.dataset.productTitle || "",
+        url: root.dataset.productUrl || "",
       },
       customer: resolveCustomerContext(rawCustomer),
       loginUrl: root.dataset.loginUrl || "/account/login",

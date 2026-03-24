@@ -43,6 +43,15 @@ async function getQuestions(shopId, filters = {}) {
     prisma.question.findMany({
       where,
       include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            firstImageUrl: true,
+            frontendUrl: true,
+            handle: true,
+          },
+        },
         category: true,
         contributor: { select: { id: true, name: true, email: true, trusted: true } },
         _count: { select: { answers: true, votes: true } },
@@ -65,6 +74,15 @@ async function getQuestion(shopId, id) {
   return prisma.question.findFirst({
     where: { id, shopId },
     include: {
+      product: {
+        select: {
+          id: true,
+          title: true,
+          firstImageUrl: true,
+          frontendUrl: true,
+          handle: true,
+        },
+      },
       category: true,
       contributor: { select: { id: true, name: true, email: true, trusted: true } },
       answers: {
@@ -95,7 +113,7 @@ async function createQuestion(shopId, data) {
       publishedAt,
       shopId,
     },
-    include: { category: true },
+    include: { category: true, product: true },
   });
 }
 
@@ -116,7 +134,7 @@ async function updateQuestion(shopId, id, data) {
   return prisma.question.update({
     where: { id },
     data: updateData,
-    include: { category: true },
+    include: { category: true, product: true },
   });
 }
 
@@ -201,7 +219,7 @@ async function moderateQuestion(shopId, id, action) {
   return prisma.question.update({
     where: { id },
     data: updateData,
-    include: { category: true },
+    include: { category: true, product: true },
   });
 }
 

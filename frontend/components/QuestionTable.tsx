@@ -2,19 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import MaterialIcon from "@/components/MaterialIcon";
-
-interface Question {
-  id: string;
-  question: string;
-  answer: string;
-  status: string;
-  views: number;
-  helpful: number;
-  voteScore: number;
-  category?: { name: string } | null;
-  contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;
-  _count?: { answers: number; votes: number };
-}
+import { type Question } from "@/services/shopifyApi";
 
 interface QuestionTableProps {
   questions: Question[];

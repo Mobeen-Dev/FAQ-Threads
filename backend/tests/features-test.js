@@ -254,20 +254,25 @@ async function testWebhooks() {
   const productTag = `prod-scope-${Date.now()}`;
   const questionA = `${productTag}-A`;
   const questionB = `${productTag}-B`;
+  const productAUrl = "https://feat-test.myshopify.com/products/product-a";
+  const productBUrl = "https://feat-test.myshopify.com/products/product-b";
 
   r = await req("POST", `/webhooks/${USER_ID}/faq`, {
     question: questionA,
     productId: "product-111",
     productHandle: "product-a",
+    productUrl: productAUrl,
     customer: { email: "product-a@test.com", name: "Product A User" },
   });
   assert(r.status === 201, "Webhook POST product A question");
   assert(r.data.status === "published", "Product A question published");
+  const productAQuestionId = r.data.questionId;
 
   r = await req("POST", `/webhooks/${USER_ID}/faq`, {
     question: questionB,
     productId: "product-222",
     productHandle: "product-b",
+    productUrl: productBUrl,
     customer: { email: "product-b@test.com", name: "Product B User" },
   });
   assert(r.status === 201, "Webhook POST product B question");
@@ -284,6 +289,27 @@ async function testWebhooks() {
   assert(r.status === 200, "Webhook GET with productHandle works");
   assert(productBQuestions.includes(questionB), "Product B fetch includes product B question");
   assert(!productBQuestions.includes(questionA), "Product B fetch excludes product A question");
+
+  // Verify product linkage exists in admin question detail
+  r = await req("GET", `/questions/${productAQuestionId}`);
+  assert(r.status === 200, "Admin GET question with product returns 200");
+  assert(!!r.data.question.product, "Admin question has linked product object");
+  assert(
+    r.data.question.product?.frontendUrl === "https://feat-test.myshopify.com/products/product-a",
+    "Product frontend URL stored in linked product"
+  );
+
+  // Product linkage should be immutable via webhook PUT
+  r = await req("PUT", `/webhooks/${USER_ID}/faq`, {
+    id: productAQuestionId,
+    question: `${questionA}-updated`,
+    productHandle: "product-z",
+    productTitle: "Mutated title",
+    productUrl: "https://feat-test.myshopify.com/products/product-z",
+  });
+  assert(r.status === 200, "Webhook PUT question update accepted");
+  assert(r.data.question.productHandle === "product-a", "Webhook PUT cannot mutate productHandle");
+  assert(r.data.question.productTitle !== "Mutated title", "Webhook PUT cannot mutate productTitle");
 
   // Reset webhook publishing behavior for later tests.
   await req("PUT", "/settings", { autoPublishQuestions: false, manualPublishQuestions: true });

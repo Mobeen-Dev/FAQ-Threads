@@ -104,6 +104,13 @@ export interface Question {
   productId?: string | null;
   productHandle?: string | null;
   productTitle?: string | null;
+  product?: {
+    id: string;
+    title: string;
+    firstImageUrl?: string | null;
+    frontendUrl: string;
+    handle?: string | null;
+  } | null;
   categoryId: string | null;
   category?: Category;
   contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;

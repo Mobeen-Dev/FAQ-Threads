@@ -15,6 +15,7 @@
       data-product-id="{{ product.id }}"
       data-product-handle="{{ product.handle | escape }}"
       data-product-title="{{ product.title | escape }}"
+      data-product-url="{{ shop.url }}{{ product.url }}"
       data-customer-logged-in="{% if customer %}true{% else %}false{% endif %}"
       data-customer-id="{% if customer %}{{ customer.id }}{% endif %}"
       data-customer-name="{% if customer %}{{ customer.name | default: customer.first_name | escape }}{% endif %}"
