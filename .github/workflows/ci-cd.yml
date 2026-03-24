@@ -18,6 +18,8 @@ jobs:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          DB_APP_USER: ${{ secrets.DB_APP_USER }}
+          DB_APP_PASSWORD: ${{ secrets.DB_APP_PASSWORD }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
@@ -39,11 +41,19 @@ jobs:
           if [ -z "$ALLOWED_ORIGINS" ]; then
             ALLOWED_ORIGINS="$FRONTEND_URL"
           fi
+          DB_APP_USER="${DB_APP_USER:-$POSTGRES_USER}"
+          DB_APP_PASSWORD="${DB_APP_PASSWORD:-$POSTGRES_PASSWORD}"
+          DB_APP_USER_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_USER")"
+          DB_APP_PASSWORD_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_PASSWORD")"
+          DATABASE_URL="postgresql://${DB_APP_USER_ENC}:${DB_APP_PASSWORD_ENC}@postgres:5432/${POSTGRES_DB}"
 
           cat > deploy/.env.production <<EOF
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}
+          DB_APP_USER=${DB_APP_USER}
+          DB_APP_PASSWORD=${DB_APP_PASSWORD}
+          DATABASE_URL=${DATABASE_URL}
           FRONTEND_URL=${FRONTEND_URL}
           BACKEND_URL=${BACKEND_URL}
           NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
@@ -95,6 +105,10 @@ jobs:
       - name: ⏱️ Wait for startup
         run: |
           sleep 20
+
+      - name: 🧪 Check Database Connectivity
+        run: |
+          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T backend node -e 'const {Client}=require("pg");(async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});try{await c.connect();const r=await c.query("select current_user, current_database()");console.log("✅ Database connectivity ok", r.rows[0]);}catch(e){console.error("❌ Database connectivity failed:", e.message);process.exit(1);}finally{await c.end().catch(()=>{});}})();'
 
       - name: 🏥 Check Backend Health
         run: |

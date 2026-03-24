@@ -29,7 +29,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4004
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}

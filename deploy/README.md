@@ -36,6 +36,8 @@ PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
    - `POSTGRES_USER`
    - `POSTGRES_PASSWORD`
    - `POSTGRES_DB`
+   - `DB_APP_USER` (recommended; defaults to `POSTGRES_USER` if omitted)
+   - `DB_APP_PASSWORD` (recommended; defaults to `POSTGRES_PASSWORD` if omitted)
    - `FRONTEND_URL`
    - `BACKEND_URL`
    - `JWT_SECRET`
@@ -47,6 +49,46 @@ Admin API traffic is forced to internal routing:
 - browser uses `NEXT_PUBLIC_API_URL=/api`
 - frontend container proxies `/api/*` to `INTERNAL_API_URL=http://backend:4004/api`
 5. Keep `deploy/.env.production.example` as the reference template.
+
+## Database credential hardening (recommended)
+
+Avoid using the `postgres` superuser for application traffic. Use a dedicated app role instead.
+
+Suggested one-time setup (run inside postgres container):
+
+```bash
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE ROLE faq_app_user WITH LOGIN PASSWORD 'REPLACE_ME';"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT CONNECT ON DATABASE \"$POSTGRES_DB\" TO faq_app_user;"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT USAGE, CREATE ON SCHEMA public TO faq_app_user;"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO faq_app_user;"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO faq_app_user;"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO faq_app_user;"
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO faq_app_user;"
+```
+
+Then set secrets:
+
+- `DB_APP_USER=faq_app_user`
+- `DB_APP_PASSWORD=<strong-random-password>`
+
+The workflow generates `DATABASE_URL` from app credentials (falls back to `POSTGRES_*` for backward compatibility).
+Credential values are URL-encoded when building `DATABASE_URL` to avoid auth failures when passwords contain reserved URL characters.
+
+### Safe password rotation order
+
+For volume-backed Postgres, changing env vars alone does not update existing role passwords. Rotate in this order:
+
+1. `ALTER ROLE <db_app_user> WITH PASSWORD '<new_password>';`
+2. Update GitHub secret `DB_APP_PASSWORD`.
+3. Redeploy from `deploy` branch.
+4. Confirm CI step `🧪 Check Database Connectivity` is green.
 
 ## Runner Docker access verification and recovery
 
