@@ -19,6 +19,7 @@ When code is pushed to `deploy`:
 3. Runs:
    - `docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
    - fallback if required by runner policy: `sudo -n docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
+   - on rare BuildKit snapshot/cache corruption (`parent snapshot ... does not exist`), pipeline auto-recovers by pruning build cache and retrying with `--no-cache`.
 4. Checks backend (`/health`) and frontend (`/login`) locally.
 5. Prints compose logs on failure.
 

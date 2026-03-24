@@ -115,7 +115,17 @@ jobs:
 
       - name: 🏗️ Build and start services
         run: |
-          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build
+          set -euo pipefail
+          COMPOSE_BASE="${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml"
+          if ${COMPOSE_BASE} up -d --build; then
+            exit 0
+          fi
+
+          echo "⚠️ Initial compose build failed. Attempting BuildKit cache/snapshot recovery and retry..."
+          docker builder prune -f || true
+          docker image prune -f || true
+          ${COMPOSE_BASE} build --pull --no-cache
+          ${COMPOSE_BASE} up -d
 
       - name: ⏱️ Wait for startup
         run: |
