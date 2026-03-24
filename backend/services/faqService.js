@@ -158,7 +158,23 @@ async function getAnswers(shopId, questionId, filters = {}) {
     where,
     include: {
       contributor: { select: { id: true, name: true, email: true, trusted: true } },
-      question: { select: { id: true, question: true, status: true } },
+      question: {
+        select: {
+          id: true,
+          question: true,
+          status: true,
+          productTitle: true,
+          productHandle: true,
+          product: {
+            select: {
+              title: true,
+              firstImageUrl: true,
+              frontendUrl: true,
+              handle: true,
+            },
+          },
+        },
+      },
       _count: { select: { votes: true } },
     },
     orderBy: [{ createdAt: "desc" }, { voteScore: "desc" }],

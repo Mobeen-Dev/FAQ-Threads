@@ -128,7 +128,19 @@ export interface Answer {
   voteScore: number;
   source: string;
   contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;
-  question?: { id: string; question: string; status: string } | null;
+  question?: {
+    id: string;
+    question: string;
+    status: string;
+    productTitle?: string | null;
+    productHandle?: string | null;
+    product?: {
+      title?: string | null;
+      firstImageUrl?: string | null;
+      frontendUrl?: string | null;
+      handle?: string | null;
+    } | null;
+  } | null;
   _count?: { votes: number };
   publishedAt: string | null;
   createdAt: string;

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useFetch } from "@/hooks/useFetch";
 import { shopifyApi, type Answer } from "@/services/shopifyApi";
+import AssociatedProductCard from "@/components/AssociatedProductCard";
 import MaterialIcon from "@/components/MaterialIcon";
 
 const statusClasses: Record<string, string> = {
@@ -148,13 +149,25 @@ export default function AnswersPage() {
               <div key={answer.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
+                    {answer.question && (
+                      <div className="mb-3 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-stone-500 dark:text-zinc-400 mb-1">
+                          Question Context
+                        </p>
+                        <p className="text-sm text-stone-900 dark:text-zinc-100">{answer.question.question}</p>
+                        {(answer.question.product || answer.question.productTitle || answer.question.productHandle) && (
+                          <div className="mt-3">
+                            <AssociatedProductCard
+                              product={answer.question.product}
+                              productTitle={answer.question.productTitle}
+                              productHandle={answer.question.productHandle}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <p className="text-stone-900 dark:text-zinc-100">{answer.answerText}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {answer.question && (
-                        <span className="px-2 py-1 rounded-lg bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300">
-                          Q: {answer.question.question}
-                        </span>
-                      )}
                       <span className="px-2 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300">
                         Score: {answer.voteScore}
                       </span>
