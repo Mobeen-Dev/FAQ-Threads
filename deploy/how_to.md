@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 
+# 0) REQUIRED: set GitHub repository secrets before deploy
+#    DB_APP_USER and DB_APP_PASSWORD are mandatory now.
+#    Use a dedicated app role (example: faq_app_user), not postgres.
+#    Required secret set:
+#    - POSTGRES_USER
+#    - POSTGRES_PASSWORD
+#    - POSTGRES_DB
+#    - DB_APP_USER
+#    - DB_APP_PASSWORD
+#    - FRONTEND_URL
+#    - BACKEND_URL
+#    - JWT_SECRET
+#    - ALLOWED_ORIGINS (optional)
+
 # 1) Runner Docker access diagnostics
 chmod +x deploy/runner-diagnostics.sh
 ./deploy/runner-diagnostics.sh | tee deploy/runner-diagnostics.out
