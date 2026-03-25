@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const voteService = require("../services/voteService");
-const prisma = require("../services/prismaClient");
 
 // POST /api/votes — cast or toggle a vote (public, uses contributor email)
 router.post("/", async (req, res, next) => {

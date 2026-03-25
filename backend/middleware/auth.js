@@ -15,7 +15,23 @@ async function authMiddleware(req, res, next) {
     }
 
     const token = header.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!token) {
+      return res.status(401).json({ error: "Token not provided" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtError) {
+      if (jwtError.name === "JsonWebTokenError" || jwtError.name === "TokenExpiredError") {
+        return res.status(401).json({ error: "Invalid or expired token" });
+      }
+      throw jwtError;
+    }
+
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ error: "Invalid token payload" });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -29,14 +45,11 @@ async function authMiddleware(req, res, next) {
     req.userId = user.id;
     req.user = user;
     // Attach first shop if exists (for backwards compat)
-    req.shopId = user.shops[0]?.id || null;
+    req.shopId = user.shops?.[0]?.id || null;
     next();
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Invalid or expired token" });
-    }
-    console.error("Auth middleware error:", error);
-    res.status(500).json({ error: "Authentication error" });
+    console.error("Auth middleware error:", error.message);
+    next(error);
   }
 }
 

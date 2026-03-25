@@ -6,10 +6,28 @@ const prisma = require("../services/prismaClient");
 const authMiddleware = require("../middleware/auth");
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = "7d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
+// Security: Validate JWT_SECRET is properly configured
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET. Set JWT_SECRET in backend/.env");
+}
+
+if (JWT_SECRET.length < 32) {
+  throw new Error(
+    "JWT_SECRET is too weak. Must be at least 32 characters. " +
+    "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+  );
+}
+
+const WEAK_SECRETS = [
+  "your-jwt-secret-change-in-production",
+  "secret",
+  "jwt-secret",
+  "changeme",
+];
+if (WEAK_SECRETS.some((weak) => JWT_SECRET.toLowerCase().includes(weak))) {
+  throw new Error("JWT_SECRET contains a default/weak value. Please generate a secure random secret.");
 }
 
 // Sign up

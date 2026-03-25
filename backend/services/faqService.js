@@ -1,6 +1,55 @@
 const prisma = require("./prismaClient");
 const settingsService = require("./settingsService");
 
+// ---------- Validation Helpers ----------
+
+const MAX_QUESTION_LENGTH = 5000;
+const MAX_ANSWER_LENGTH = 20000;
+const MAX_NAME_LENGTH = 200;
+const MAX_EMAIL_LENGTH = 254;
+const VALID_STATUSES = ["pending", "draft", "published", "rejected", "suspended"];
+
+function validateString(value, maxLen, fieldName) {
+  if (value && typeof value !== "string") {
+    throw Object.assign(new Error(`${fieldName} must be a string`), { status: 400 });
+  }
+  if (value && value.length > maxLen) {
+    throw Object.assign(new Error(`${fieldName} exceeds maximum length of ${maxLen}`), { status: 400 });
+  }
+  return value;
+}
+
+function validateStatus(status) {
+  if (status && !VALID_STATUSES.includes(status)) {
+    throw Object.assign(new Error(`Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`), { status: 400 });
+  }
+  return status;
+}
+
+function sanitizeInput(data, rules) {
+  const sanitized = {};
+  for (const [key, { maxLen, required, type, validator }] of Object.entries(rules)) {
+    const value = data[key];
+    if (required && (value === undefined || value === null || value === "")) {
+      throw Object.assign(new Error(`${key} is required`), { status: 400 });
+    }
+    if (value !== undefined && value !== null) {
+      if (type === "string") {
+        validateString(value, maxLen, key);
+        sanitized[key] = String(value).trim();
+      } else if (type === "status") {
+        validateStatus(value);
+        sanitized[key] = value;
+      } else if (validator) {
+        sanitized[key] = validator(value, key);
+      } else {
+        sanitized[key] = value;
+      }
+    }
+  }
+  return sanitized;
+}
+
 // ---------- Categories ----------
 
 async function getCategories(shopId) {
@@ -97,17 +146,27 @@ async function getQuestion(shopId, id) {
 }
 
 async function createQuestion(shopId, data) {
-  const publishedAt = (data.status === "published") ? new Date() : null;
+  // Validate and sanitize input
+  const validated = sanitizeInput(data, {
+    question: { type: "string", maxLen: MAX_QUESTION_LENGTH, required: true },
+    answer: { type: "string", maxLen: MAX_ANSWER_LENGTH },
+    status: { type: "status" },
+    customerName: { type: "string", maxLen: MAX_NAME_LENGTH },
+    customerEmail: { type: "string", maxLen: MAX_EMAIL_LENGTH },
+    customerPhone: { type: "string", maxLen: 50 },
+  });
+
+  const publishedAt = (validated.status === "published") ? new Date() : null;
   return prisma.question.create({
     data: {
-      question: data.question,
-      answer: data.answer || "",
+      question: validated.question,
+      answer: validated.answer || "",
       categoryId: data.categoryId || null,
-      status: data.status || "pending",
+      status: validated.status || "pending",
       source: data.source || "dashboard",
-      customerName: data.customerName || null,
-      customerEmail: data.customerEmail || null,
-      customerPhone: data.customerPhone || null,
+      customerName: validated.customerName || null,
+      customerEmail: validated.customerEmail || null,
+      customerPhone: validated.customerPhone || null,
       customerId: data.customerId || null,
       contributorId: data.contributorId || null,
       publishedAt,
@@ -119,15 +178,22 @@ async function createQuestion(shopId, data) {
 
 async function updateQuestion(shopId, id, data) {
   const existing = await prisma.question.findFirst({ where: { id, shopId } });
-  if (!existing) throw new Error("Question not found");
+  if (!existing) throw Object.assign(new Error("Question not found"), { status: 404 });
+
+  // Validate input
+  const validated = sanitizeInput(data, {
+    question: { type: "string", maxLen: MAX_QUESTION_LENGTH },
+    answer: { type: "string", maxLen: MAX_ANSWER_LENGTH },
+    status: { type: "status" },
+  });
 
   const updateData = {};
-  if (data.question !== undefined) updateData.question = data.question;
-  if (data.answer !== undefined) updateData.answer = data.answer;
+  if (validated.question !== undefined) updateData.question = validated.question;
+  if (validated.answer !== undefined) updateData.answer = validated.answer;
   if (data.categoryId !== undefined) updateData.categoryId = data.categoryId || null;
-  if (data.status !== undefined) {
-    updateData.status = data.status;
-    if (data.status === "published" && !existing.publishedAt) updateData.publishedAt = new Date();
+  if (validated.status !== undefined) {
+    updateData.status = validated.status;
+    if (validated.status === "published" && !existing.publishedAt) updateData.publishedAt = new Date();
   }
   if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
@@ -183,14 +249,20 @@ async function getAnswers(shopId, questionId, filters = {}) {
 
 async function createAnswer(shopId, questionId, data) {
   const q = await prisma.question.findFirst({ where: { id: questionId, shopId } });
-  if (!q) throw new Error("Question not found");
+  if (!q) throw Object.assign(new Error("Question not found"), { status: 404 });
 
-  const publishedAt = (data.status === "published") ? new Date() : null;
+  // Validate input
+  const validated = sanitizeInput(data, {
+    answerText: { type: "string", maxLen: MAX_ANSWER_LENGTH, required: true },
+    status: { type: "status" },
+  });
+
+  const publishedAt = (validated.status === "published") ? new Date() : null;
 
   return prisma.answer.create({
     data: {
-      answerText: data.answerText,
-      status: data.status || "pending",
+      answerText: validated.answerText,
+      status: validated.status || "pending",
       source: data.source || "dashboard",
       contributorId: data.contributorId || null,
       questionId,

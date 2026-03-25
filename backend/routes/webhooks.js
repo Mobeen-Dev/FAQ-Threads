@@ -5,11 +5,52 @@ const contributorService = require("../services/contributorService");
 const settingsService = require("../services/settingsService");
 const productService = require("../services/productService");
 
+// ---------- Input Validation ----------
+
+const MAX_QUESTION_LENGTH = 5000;
+const MAX_ANSWER_LENGTH = 20000;
+const MAX_NAME_LENGTH = 200;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_PHONE_LENGTH = 50;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Validate and sanitize a string field
+ */
+function sanitizeString(value, maxLen) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return String(value).slice(0, maxLen).trim();
+  return value.slice(0, maxLen).trim();
+}
+
+/**
+ * Validate email format (basic)
+ */
+function isValidEmail(email) {
+  if (!email || typeof email !== "string") return false;
+  return email.length <= MAX_EMAIL_LENGTH && EMAIL_REGEX.test(email);
+}
+
+/**
+ * Safe JSON parser - avoids crashes when body is malformed string
+ */
+function safeParseBody(body) {
+  if (typeof body !== "string") return body;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
+}
+
 async function findShopByWebhookIdentifier(identifier) {
+  // Security: Only accept webhookKey for public webhook endpoints
+  // Never accept userId directly - it could be predictable/enumerable
+  if (!identifier || typeof identifier !== "string" || identifier.length < 10) {
+    return null;
+  }
   return prisma.shop.findFirst({
-    where: {
-      OR: [{ webhookKey: identifier }, { userId: identifier }],
-    },
+    where: { webhookKey: identifier },
   });
 }
 
@@ -17,12 +58,17 @@ async function findShopByWebhookIdentifier(identifier) {
  * POST /api/webhooks/:identifier/faq
  * Receive a new FAQ question from a storefront.
  */
-router.post("/:identifier/faq", async (req, res) => {
+router.post("/:identifier/faq", async (req, res, next) => {
   try {
     const { identifier } = req.params;
-    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const payload = safeParseBody(req.body);
+    if (!payload) {
+      return res.status(400).json({ error: "Invalid JSON payload" });
+    }
 
-    if (!payload.question && !payload.title) {
+    // Validate and sanitize question
+    const questionText = sanitizeString(payload.question || payload.title, MAX_QUESTION_LENGTH);
+    if (!questionText) {
       return res.status(400).json({ error: "Field 'question' is required" });
     }
 
@@ -30,15 +76,16 @@ router.post("/:identifier/faq", async (req, res) => {
     if (!shop) return res.status(404).json({ error: "No shop found for this webhook URL" });
 
     const customer = payload.customer || {};
-    const customerEmail = customer.email || payload.customerEmail || null;
+    const rawEmail = customer.email || payload.customerEmail || null;
+    const customerEmail = rawEmail && isValidEmail(rawEmail) ? sanitizeString(rawEmail, MAX_EMAIL_LENGTH) : null;
 
     // Find or create contributor
     let contributor = null;
     if (customerEmail) {
       contributor = await contributorService.findOrCreateContributor(shop.id, {
         email: customerEmail,
-        name: customer.name || payload.customerName || null,
-        phone: customer.phone || payload.customerPhone || null,
+        name: sanitizeString(customer.name || payload.customerName, MAX_NAME_LENGTH),
+        phone: sanitizeString(customer.phone || payload.customerPhone, MAX_PHONE_LENGTH),
         id: customer.id || payload.customerId || null,
       });
       if (contributor?.status === "suspended") {
@@ -49,7 +96,7 @@ router.post("/:identifier/faq", async (req, res) => {
     // Determine status via publishing rules
     const status = await settingsService.resolveQuestionStatus(shop.id, contributor?.id);
     const resolvedProductHandle = payload.productHandle
-      ? String(payload.productHandle)
+      ? sanitizeString(payload.productHandle, 255)
       : productService.extractHandleFromUrl(payload.productUrl ? String(payload.productUrl) : null);
     let linkedProduct = null;
     try {
@@ -60,17 +107,17 @@ router.post("/:identifier/faq", async (req, res) => {
 
     const question = await prisma.question.create({
       data: {
-        question: payload.question || payload.title,
-        answer: payload.answer || "",
+        question: questionText,
+        answer: sanitizeString(payload.answer, MAX_ANSWER_LENGTH) || "",
         status,
         source: "webhook",
-        productId: payload.productId ? String(payload.productId) : null,
+        productId: payload.productId ? sanitizeString(payload.productId, 255) : null,
         productHandle: resolvedProductHandle || null,
-        productTitle: payload.productTitle ? String(payload.productTitle) : (linkedProduct?.title || null),
+        productTitle: sanitizeString(payload.productTitle, 500) || linkedProduct?.title || null,
         productRefId: linkedProduct?.id || null,
-        customerName: customer.name || payload.customerName || null,
+        customerName: sanitizeString(customer.name || payload.customerName, MAX_NAME_LENGTH),
         customerEmail,
-        customerPhone: customer.phone || payload.customerPhone || null,
+        customerPhone: sanitizeString(customer.phone || payload.customerPhone, MAX_PHONE_LENGTH),
         customerId: customer.id || payload.customerId || null,
         contributorId: contributor?.id || null,
         publishedAt: status === "published" ? new Date() : null,
@@ -85,8 +132,7 @@ router.post("/:identifier/faq", async (req, res) => {
       message: status === "published" ? "Question published" : "Question received and queued for review",
     });
   } catch (error) {
-    console.error("Webhook POST error:", error);
-    res.status(500).json({ error: "Failed to process webhook" });
+    next(error);
   }
 });
 
@@ -94,12 +140,17 @@ router.post("/:identifier/faq", async (req, res) => {
  * POST /api/webhooks/:identifier/answer
  * Submit an answer from the storefront.
  */
-router.post("/:identifier/answer", async (req, res) => {
+router.post("/:identifier/answer", async (req, res, next) => {
   try {
     const { identifier } = req.params;
-    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const payload = safeParseBody(req.body);
+    if (!payload) {
+      return res.status(400).json({ error: "Invalid JSON payload" });
+    }
 
-    if (!payload.questionId || !payload.answerText) {
+    // Validate and sanitize answer
+    const answerText = sanitizeString(payload.answerText, MAX_ANSWER_LENGTH);
+    if (!payload.questionId || !answerText) {
       return res.status(400).json({ error: "questionId and answerText are required" });
     }
 
@@ -110,14 +161,15 @@ router.post("/:identifier/answer", async (req, res) => {
     if (!question) return res.status(404).json({ error: "Question not found" });
 
     const customer = payload.customer || {};
-    const customerEmail = customer.email || payload.customerEmail || null;
+    const rawEmail = customer.email || payload.customerEmail || null;
+    const customerEmail = rawEmail && isValidEmail(rawEmail) ? sanitizeString(rawEmail, MAX_EMAIL_LENGTH) : null;
 
     let contributor = null;
     if (customerEmail) {
       contributor = await contributorService.findOrCreateContributor(shop.id, {
         email: customerEmail,
-        name: customer.name || payload.customerName || null,
-        phone: customer.phone || payload.customerPhone || null,
+        name: sanitizeString(customer.name || payload.customerName, MAX_NAME_LENGTH),
+        phone: sanitizeString(customer.phone || payload.customerPhone, MAX_PHONE_LENGTH),
         id: customer.id || payload.customerId || null,
       });
       if (contributor?.status === "suspended") {
@@ -129,7 +181,7 @@ router.post("/:identifier/answer", async (req, res) => {
 
     const answer = await prisma.answer.create({
       data: {
-        answerText: payload.answerText,
+        answerText,
         status,
         source: "webhook",
         contributorId: contributor?.id || null,
@@ -146,8 +198,7 @@ router.post("/:identifier/answer", async (req, res) => {
       message: status === "published" ? "Answer published" : "Answer received and queued for review",
     });
   } catch (error) {
-    console.error("Webhook answer POST error:", error);
-    res.status(500).json({ error: "Failed to process answer" });
+    next(error);
   }
 });
 
@@ -155,10 +206,13 @@ router.post("/:identifier/answer", async (req, res) => {
  * POST /api/webhooks/:identifier/vote
  * Cast a vote from the storefront.
  */
-router.post("/:identifier/vote", async (req, res) => {
+router.post("/:identifier/vote", async (req, res, next) => {
   try {
     const { identifier } = req.params;
-    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const payload = safeParseBody(req.body);
+    if (!payload) {
+      return res.status(400).json({ error: "Invalid JSON payload" });
+    }
     const { entityType, entityId, voteValue, customer } = payload;
 
     if (!entityType || !entityId || voteValue === undefined || !customer?.email) {
@@ -177,8 +231,7 @@ router.post("/:identifier/vote", async (req, res) => {
     const result = await voteService.castVote(shop.id, contributor.id, entityType, entityId, voteValue);
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error("Webhook vote error:", error);
-    res.status(500).json({ error: "Failed to process vote" });
+    next(error);
   }
 });
 
@@ -186,10 +239,13 @@ router.post("/:identifier/vote", async (req, res) => {
  * PUT /api/webhooks/:identifier/faq
  * Update an existing FAQ question.
  */
-router.put("/:identifier/faq", async (req, res) => {
+router.put("/:identifier/faq", async (req, res, next) => {
   try {
     const { identifier } = req.params;
-    const payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const payload = safeParseBody(req.body);
+    if (!payload) {
+      return res.status(400).json({ error: "Invalid JSON payload" });
+    }
 
     if (!payload.id) return res.status(400).json({ error: "Question 'id' is required for updates" });
 
@@ -228,8 +284,7 @@ router.put("/:identifier/faq", async (req, res) => {
 
     res.json({ success: true, question: updated });
   } catch (error) {
-    console.error("Webhook PUT error:", error);
-    res.status(500).json({ error: "Failed to process webhook" });
+    next(error);
   }
 });
 
@@ -300,8 +355,7 @@ router.get("/:identifier/faq", async (req, res) => {
 
     res.json({ faqs: questions, total: questions.length });
   } catch (error) {
-    console.error("Webhook GET error:", error);
-    res.status(500).json({ error: "Failed to fetch FAQs" });
+    next(error);
   }
 });
 
