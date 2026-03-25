@@ -165,11 +165,6 @@ jobs:
             sh "$EFFECTIVE_DB_PASSWORD" "$EFFECTIVE_DB_USER" "$POSTGRES_DB"
           echo "✅ Database connectivity ok"
 
-      - name: 📌 Promote deploy env file
-        run: |
-          cp "${DOCKER_ENV_FILE}" deploy/.env.production
-          echo "✅ Promoted ${DOCKER_ENV_FILE} -> deploy/.env.production"
-
       - name: 🏥 Check Backend Health
         run: |
           for i in {1..15}; do
@@ -195,6 +190,11 @@ jobs:
           done
           echo "❌ Frontend health check failed!"
           exit 1
+
+      - name: 📌 Promote deploy env file
+        run: |
+          cp "${DOCKER_ENV_FILE}" deploy/.env.production
+          echo "✅ Promoted ${DOCKER_ENV_FILE} -> deploy/.env.production"
 
       - name: ✅ Deployment status
         run: |
