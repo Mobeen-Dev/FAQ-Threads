@@ -41,28 +41,25 @@ jobs:
           if [ -z "$ALLOWED_ORIGINS" ]; then
             ALLOWED_ORIGINS="$FRONTEND_URL"
           fi
-          if [ -n "${DB_APP_USER:-}" ] || [ -n "${DB_APP_PASSWORD:-}" ]; then
-            if [ -z "${DB_APP_USER:-}" ] || [ -z "${DB_APP_PASSWORD:-}" ]; then
-              echo "❌ DB app credentials must be configured as a pair."
-              echo "Set both DB_APP_USER and DB_APP_PASSWORD, or leave both unset."
-              exit 1
-            fi
-          else
-            DB_APP_USER="$POSTGRES_USER"
-            DB_APP_PASSWORD="$POSTGRES_PASSWORD"
+          if [ -z "${DB_APP_USER:-}" ] || [ -z "${DB_APP_PASSWORD:-}" ]; then
+            echo "❌ Missing DB app credentials."
+            echo "Set both DB_APP_USER and DB_APP_PASSWORD in repository secrets."
+            exit 1
           fi
 
-          if [ "$DB_APP_USER" = "$POSTGRES_USER" ] && [ "$DB_APP_PASSWORD" != "$POSTGRES_PASSWORD" ]; then
-            echo "❌ DB_APP_USER resolves to POSTGRES_USER but passwords differ."
-            echo "Use POSTGRES_PASSWORD for postgres user, or set a dedicated DB_APP_USER."
+          if [ "$DB_APP_USER" = "postgres" ] || [ "$DB_APP_USER" = "$POSTGRES_USER" ]; then
+            echo "❌ DB_APP_USER must be a dedicated non-superuser role (not postgres)."
+            echo "Create an app role (for example faq_app_user) and set DB_APP_USER to that role."
             exit 1
           fi
 
           DB_APP_USER_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_USER")"
           DB_APP_PASSWORD_ENC="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1] || ""))' "$DB_APP_PASSWORD")"
           DATABASE_URL="postgresql://${DB_APP_USER_ENC}:${DB_APP_PASSWORD_ENC}@postgres:5432/${POSTGRES_DB}"
+          ENV_FILE_TMP="deploy/.env.production.ci"
+          echo "DOCKER_ENV_FILE=${ENV_FILE_TMP}" >> "$GITHUB_ENV"
 
-          cat > deploy/.env.production <<EOF
+          cat > "$ENV_FILE_TMP" <<EOF
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}
@@ -76,7 +73,7 @@ jobs:
           ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
           JWT_SECRET=${JWT_SECRET}
           EOF
-          echo "✅ deploy/.env.production generated from secrets"
+          echo "✅ ${ENV_FILE_TMP} generated from secrets"
 
       - name: 🐳 Resolve Docker Compose command
         shell: bash
@@ -111,12 +108,12 @@ jobs:
 
       - name: 🛑 Stop existing services
         run: |
-          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml down --remove-orphans || true
+          ${DOCKER_COMPOSE} --env-file "${DOCKER_ENV_FILE}" -f deploy/docker-compose.deploy.yml down --remove-orphans || true
 
       - name: 🏗️ Build and start services
         run: |
           set -euo pipefail
-          COMPOSE_BASE="${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml"
+          COMPOSE_BASE="${DOCKER_COMPOSE} --env-file ${DOCKER_ENV_FILE} -f deploy/docker-compose.deploy.yml"
           if ${COMPOSE_BASE} up -d --build; then
             exit 0
           fi
@@ -133,7 +130,24 @@ jobs:
 
       - name: 🧪 Check Database Connectivity
         run: |
-          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml exec -T backend node -e 'const {Client}=require("pg");(async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});try{await c.connect();const r=await c.query("select current_user, current_database()");console.log("✅ Database connectivity ok", r.rows[0]);}catch(e){console.error("❌ Database connectivity failed:", e.message);process.exit(1);}finally{await c.end().catch(()=>{});}})();'
+          set -euo pipefail
+          set -a
+          . "${DOCKER_ENV_FILE}"
+          set +a
+
+          EFFECTIVE_DB_USER="$DB_APP_USER"
+          EFFECTIVE_DB_PASSWORD="$DB_APP_PASSWORD"
+
+          echo "🔎 DB probe user=${EFFECTIVE_DB_USER} db=${POSTGRES_DB}"
+          ${DOCKER_COMPOSE} --env-file "${DOCKER_ENV_FILE}" -f deploy/docker-compose.deploy.yml exec -T postgres \
+            sh -lc 'PGPASSWORD="$1" psql -h 127.0.0.1 -U "$2" -d "$3" -c "select current_user, current_database();"' \
+            sh "$EFFECTIVE_DB_PASSWORD" "$EFFECTIVE_DB_USER" "$POSTGRES_DB"
+          echo "✅ Database connectivity ok"
+
+      - name: 📌 Promote deploy env file
+        run: |
+          cp "${DOCKER_ENV_FILE}" deploy/.env.production
+          echo "✅ Promoted ${DOCKER_ENV_FILE} -> deploy/.env.production"
 
       - name: 🏥 Check Backend Health
         run: |
@@ -163,9 +177,9 @@ jobs:
 
       - name: ✅ Deployment status
         run: |
-          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml ps
+          ${DOCKER_COMPOSE} --env-file "${DOCKER_ENV_FILE}" -f deploy/docker-compose.deploy.yml ps
 
       - name: 📋 Dump logs on failure
         if: failure()
         run: |
-          ${DOCKER_COMPOSE} --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml logs --tail=200 || true
+          ${DOCKER_COMPOSE} --env-file "${DOCKER_ENV_FILE:-deploy/.env.production}" -f deploy/docker-compose.deploy.yml logs --tail=200 || true

@@ -14,7 +14,7 @@ This project now supports CI/CD with GitHub Actions and a deploy pipeline on a *
 
 When code is pushed to `deploy`:
 
-1. Generates `deploy/.env.production` from GitHub Secrets.
+1. Generates a temporary env file (`deploy/.env.production.ci`) from GitHub Secrets.
 2. Stops existing containers for `deploy/docker-compose.deploy.yml`.
 3. Runs:
    - `docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`
@@ -22,6 +22,8 @@ When code is pushed to `deploy`:
    - on rare BuildKit snapshot/cache corruption (`parent snapshot ... does not exist`), pipeline auto-recovers by pruning build cache and retrying with `--no-cache`.
 4. Checks backend (`/health`) and frontend (`/login`) locally.
 5. Prints compose logs on failure.
+6. Verifies DB credentials by running `psql` inside the `postgres` container (independent of backend container restart state).
+7. Promotes `deploy/.env.production.ci` to `deploy/.env.production` only after successful deploy checks.
 
 PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
 
@@ -37,8 +39,8 @@ PostgreSQL is exposed on host port `5434` (`5434:5432`) for external access.
    - `POSTGRES_USER`
    - `POSTGRES_PASSWORD`
    - `POSTGRES_DB`
-   - `DB_APP_USER` (optional, but must be paired with `DB_APP_PASSWORD`)
-   - `DB_APP_PASSWORD` (optional, but must be paired with `DB_APP_USER`)
+   - `DB_APP_USER` (**required**, must be dedicated non-superuser role)
+   - `DB_APP_PASSWORD` (**required**, app-role password)
    - `FRONTEND_URL`
    - `BACKEND_URL`
    - `JWT_SECRET`
@@ -79,10 +81,9 @@ Then set secrets:
 - `DB_APP_USER=faq_app_user`
 - `DB_APP_PASSWORD=<strong-random-password>`
 
-The workflow generates `DATABASE_URL` from app credentials.
-- If both `DB_APP_USER` and `DB_APP_PASSWORD` are set, those are used.
-- If neither is set, it falls back to `POSTGRES_USER` + `POSTGRES_PASSWORD`.
-- If only one is set, deployment fails fast with a clear error.
+The workflow generates `DATABASE_URL` from app credentials and enforces:
+- `DB_APP_USER` and `DB_APP_PASSWORD` are required.
+- `DB_APP_USER` cannot be `postgres` (or equal to `POSTGRES_USER`).
 Credential values are URL-encoded when building `DATABASE_URL` to avoid auth failures when passwords contain reserved URL characters.
 
 ### Safe password rotation order
@@ -93,6 +94,21 @@ For volume-backed Postgres, changing env vars alone does not update existing rol
 2. Update GitHub secret `DB_APP_PASSWORD`.
 3. Redeploy from `deploy` branch.
 4. Confirm CI step `🧪 Check Database Connectivity` is green.
+
+## Emergency recovery (without deleting DB)
+
+If production enters auth-failure loop (`P1000` / password auth failed), run:
+
+```bash
+chmod +x deploy/recover-db-auth.sh
+./deploy/recover-db-auth.sh
+```
+
+This script:
+- reads effective credentials from `deploy/.env.production`,
+- updates DB role password with `ALTER ROLE` (non-destructive),
+- verifies DB login,
+- recreates backend container (force env refresh) and checks `/health`.
 
 ## Runner Docker access verification and recovery
 
