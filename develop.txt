@@ -1,0 +1,85 @@
+● How to Run the FAQ App
+
+  1. Database Setup (PostgreSQL)
+
+  First, you need PostgreSQL running. Options:
+
+   # Option A: If you have PostgreSQL installed locally
+   # Make sure the service is running, then create a database:
+   psql -U postgres -c "CREATE DATABASE faq_app;"
+   
+   # Option B: Using Docker (easiest)
+   docker run -d --name faq-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=faq_app -p 5432:5432 postgres:15
+
+  2. Backend Setup
+
+   # Navigate to backend
+   cd C:\Shopify_app_Dev\faq-app\backend
+   
+   # Install dependencies
+   npm install
+   
+   # Create .env file (copy from example if exists, or create manually)
+   # Required variables:
+
+  Create backend/.env with:
+
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/faq_app"
+   JWT_SECRET="your-secret-key-here"
+   FRONTEND_URL="http://localhost:3004"
+   PORT=4004
+
+   # Run database migrations
+   npx prisma migrate dev --name init
+   
+   # Generate Prisma client
+   npx prisma generate
+   
+   # Start the backend server (port 4004)
+   npm run dev
+
+  3. Frontend Setup
+
+  Open a new terminal:
+
+   # Navigate to frontend
+   cd C:\Shopify_app_Dev\faq-app\frontend
+   
+   # Install dependencies
+   npm install
+   
+   # Create .env.local file
+
+  Create frontend/.env.local with:
+
+   NEXT_PUBLIC_API_URL=http://localhost:4004/api
+
+   # Start the frontend server (port 3004)
+   npm run dev
+
+  4. Verify Everything Works
+
+  ┌────────────────┬─────────────────────────────────────────┬───────────────────┐
+  │ Check          │ URL                                     │ Expected          │
+  ├────────────────┼─────────────────────────────────────────┼───────────────────┤
+  │ Backend health │ http://localhost:4004/health            │ {"status":"ok"}   │
+  ├────────────────┼─────────────────────────────────────────┼───────────────────┤
+  │ Frontend       │ http://localhost:3004                   │ Login page        │
+  ├────────────────┼─────────────────────────────────────────┼───────────────────┤
+  │ Database       │ npx prisma studio (in backend folder)   │ Opens DB browser  │
+  └────────────────┴─────────────────────────────────────────┴───────────────────┘
+
+  Quick verification commands:
+
+   # Test backend health endpoint
+   curl http://localhost:4004/health
+   
+   # Or with PowerShell
+   Invoke-RestMethod http://localhost:4004/health
+
+  Summary - Run Order
+
+   1. Database → Start PostgreSQL (or Docker container)
+   2. Backend → cd backend && npm run dev (runs on port 4004)
+   3. Frontend → cd frontend && npm run dev (runs on port 3004)
+   4. Open browser → http://localhost:3004 (http://localhost:3004)
