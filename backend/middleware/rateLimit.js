@@ -1,5 +1,15 @@
 const buckets = new Map();
 
+// Cleanup expired entries every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of buckets) {
+    if (entry.expiresAt <= now) {
+      buckets.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 function keyFromRequest(req) {
   const ipHeader = req.headers["x-forwarded-for"];
   const forwardedIp = Array.isArray(ipHeader) ? ipHeader[0] : ipHeader?.split(",")[0];

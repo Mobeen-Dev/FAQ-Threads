@@ -72,6 +72,12 @@ app.use("/api/contributors", contributorRoutes);
 app.use(errorHandler);
 
 const server = http.createServer(app);
+
+// Prevent slow requests from holding connections forever
+server.timeout = 30000;        // 30s max request time
+server.keepAliveTimeout = 65000; // Slightly higher than typical LB timeout (60s)
+server.headersTimeout = 66000;   // Must be > keepAliveTimeout
+
 server.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
 });
