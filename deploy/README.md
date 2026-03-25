@@ -15,6 +15,7 @@ This project now supports CI/CD with GitHub Actions and a deploy pipeline on a *
 When code is pushed to `deploy`:
 
 1. Generates a temporary env file (`deploy/.env.production.ci`) from GitHub Secrets.
+   - If unavailable later in the job, workflow falls back to existing `deploy/.env.production`.
 2. Stops existing containers for `deploy/docker-compose.deploy.yml`.
 3. Runs:
    - `docker compose --env-file deploy/.env.production -f deploy/docker-compose.deploy.yml up -d --build`

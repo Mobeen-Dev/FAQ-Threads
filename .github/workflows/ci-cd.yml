@@ -106,6 +106,27 @@ jobs:
           echo "2) Allow passwordless sudo for /usr/bin/docker."
           exit 1
 
+      - name: 🧰 Resolve deploy env file path
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${DOCKER_ENV_FILE:-}" ] && [ -f "${DOCKER_ENV_FILE}" ]; then
+            echo "✅ Using generated env file: ${DOCKER_ENV_FILE}"
+            exit 0
+          fi
+
+          if [ -f "deploy/.env.production" ]; then
+            echo "DOCKER_ENV_FILE=deploy/.env.production" >> "$GITHUB_ENV"
+            echo "⚠️ Falling back to deploy/.env.production"
+            exit 0
+          fi
+
+          echo "❌ No deploy env file found."
+          echo "Expected one of:"
+          echo " - ${DOCKER_ENV_FILE:-deploy/.env.production.ci}"
+          echo " - deploy/.env.production"
+          exit 1
+
       - name: 🛑 Stop existing services
         run: |
           ${DOCKER_COMPOSE} --env-file "${DOCKER_ENV_FILE}" -f deploy/docker-compose.deploy.yml down --remove-orphans || true
