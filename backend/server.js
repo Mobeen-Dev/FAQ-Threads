@@ -50,8 +50,9 @@ const webhookWriteRateLimiter = createRateLimiter({
   message: "Webhook rate limit exceeded. Please slow down.",
 });
 
-// Health check
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+// Health check (both paths for flexibility)
+app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/api/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 
 // Routes
 app.use("/api/auth", authRateLimiter, authRoutes);

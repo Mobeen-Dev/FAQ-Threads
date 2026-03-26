@@ -31,7 +31,6 @@ Thumbs.db
 logs
 *.log
 chat.md
-chat.md
 ui-extension/chat.txt
 deploy/.env.production
 # Database
@@ -41,3 +40,10 @@ deploy/.env.production
 
 # Prisma
 prisma/migrations/*/migration.sql
+
+# Deployment
+backups/
+deploy/nginx/ssl/
+deploy-package.tar.gz
+*.pem
+*.key

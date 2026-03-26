@@ -1,0 +1,411 @@
+# =============================================================================
+# FAQ App - CI/CD Pipeline
+# =============================================================================
+# This workflow builds, tests, and deploys the FAQ App
+#
+# Required GitHub Secrets:
+#   - DB_PASSWORD: PostgreSQL password
+#   - JWT_SECRET: JWT signing secret (min 32 chars)
+#   - DEPLOY_HOST: Server IP or hostname
+#   - DEPLOY_USER: SSH username for deployment
+#   - DEPLOY_KEY: SSH private key for deployment
+#   - DEPLOY_PATH: Path on server (e.g., /opt/faq-app)
+#
+# Optional Secrets:
+#   - DOCKER_REGISTRY: Custom registry (default: ghcr.io)
+#   - PUBLIC_BACKEND_URL: Public API URL
+#   - SLACK_WEBHOOK_URL: For deployment notifications
+# =============================================================================
+name: CI/CD Pipeline Deploy
+
+on:
+  push:
+    branches: [ master, deploy ]
+  workflow_dispatch: # Manual trigger button in GitHub UI
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    - name: Debug info
+      run: echo "Branch is ${{ github.ref }} / ${{ github.head_ref }}"
+
+# name: CI/CD Pipeline
+
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: 'Deployment environment'
+#         required: true
+#         default: 'staging'
+#         type: choice
+#         options:
+#           - staging
+#           - production
+
+# env:
+#   REGISTRY: ghcr.io
+#   IMAGE_PREFIX: ${{ github.repository }}
+#   NODE_VERSION: '20'
+
+# jobs:
+#   # ===========================================================================
+#   # Lint and Test
+#   # ===========================================================================
+#   test:
+#     name: Lint & Test
+#     runs-on: ubuntu-latest
+    
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: ${{ env.NODE_VERSION }}
+#           cache: 'npm'
+#           cache-dependency-path: |
+#             backend/package-lock.json
+#             frontend/package-lock.json
+
+#       - name: Install backend dependencies
+#         working-directory: ./backend
+#         run: npm ci
+
+#       - name: Install frontend dependencies
+#         working-directory: ./frontend
+#         run: npm ci
+
+#       - name: Lint backend
+#         working-directory: ./backend
+#         run: npm run lint --if-present
+
+#       - name: Lint frontend
+#         working-directory: ./frontend
+#         run: npm run lint --if-present
+
+#       - name: Type check frontend
+#         working-directory: ./frontend
+#         run: npx tsc --noEmit
+
+#       - name: Run backend tests
+#         working-directory: ./backend
+#         run: npm test --if-present
+#         env:
+#           NODE_ENV: test
+#           DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+#       - name: Run frontend tests
+#         working-directory: ./frontend
+#         run: npm test --if-present
+#         env:
+#           NODE_ENV: test
+
+#   # ===========================================================================
+#   # Build Docker Images
+#   # ===========================================================================
+#   build:
+#     name: Build Images
+#     runs-on: ubuntu-latest
+#     needs: test
+#     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+#     permissions:
+#       contents: read
+#       packages: write
+
+#     outputs:
+#       backend-image: ${{ steps.meta-backend.outputs.tags }}
+#       frontend-image: ${{ steps.meta-frontend.outputs.tags }}
+#       version: ${{ steps.version.outputs.version }}
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Generate version
+#         id: version
+#         run: |
+#           VERSION="${GITHUB_SHA::8}"
+#           if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+#             VERSION="latest"
+#           elif [[ "$GITHUB_REF" == "refs/heads/develop" ]]; then
+#             VERSION="develop-${GITHUB_SHA::8}"
+#           fi
+#           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       - name: Login to Container Registry
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ env.REGISTRY }}
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+
+#       - name: Backend image metadata
+#         id: meta-backend
+#         uses: docker/metadata-action@v5
+#         with:
+#           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend
+#           tags: |
+#             type=sha,prefix=
+#             type=ref,event=branch
+#             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+#       - name: Frontend image metadata
+#         id: meta-frontend
+#         uses: docker/metadata-action@v5
+#         with:
+#           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend
+#           tags: |
+#             type=sha,prefix=
+#             type=ref,event=branch
+#             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+#       - name: Build and push backend
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./backend
+#           push: true
+#           tags: ${{ steps.meta-backend.outputs.tags }}
+#           labels: ${{ steps.meta-backend.outputs.labels }}
+#           cache-from: type=gha
+#           cache-to: type=gha,mode=max
+
+#       - name: Build and push frontend
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./frontend
+#           push: true
+#           tags: ${{ steps.meta-frontend.outputs.tags }}
+#           labels: ${{ steps.meta-frontend.outputs.labels }}
+#           build-args: |
+#             NEXT_PUBLIC_API_URL=/api
+#             INTERNAL_API_URL=http://backend:4004/api
+#           cache-from: type=gha
+#           cache-to: type=gha,mode=max
+
+#   # ===========================================================================
+#   # Deploy to Staging
+#   # ===========================================================================
+#   deploy-staging:
+#     name: Deploy to Staging
+#     runs-on: ubuntu-latest
+#     needs: build
+#     if: github.ref == 'refs/heads/develop'
+#     environment:
+#       name: staging
+#       url: ${{ vars.STAGING_URL }}
+    
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Deploy to staging server
+#         uses: appleboy/ssh-action@v1.0.3
+#         with:
+#           host: ${{ secrets.STAGING_HOST || secrets.DEPLOY_HOST }}
+#           username: ${{ secrets.DEPLOY_USER }}
+#           key: ${{ secrets.DEPLOY_KEY }}
+#           script: |
+#             cd ${{ secrets.DEPLOY_PATH || '/opt/faq-app' }}
+            
+#             # Pull latest code
+#             git pull origin develop
+            
+#             # Update .env with secrets
+#             cat > .env << 'EOF'
+#             NODE_ENV=staging
+#             DB_USER=faquser
+#             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+#             DB_NAME=faq_app
+#             JWT_SECRET=${{ secrets.JWT_SECRET }}
+#             FRONTEND_URL=${{ vars.STAGING_URL || 'http://localhost:3000' }}
+#             BACKEND_URL=${{ vars.STAGING_API_URL || 'http://localhost:4004' }}
+#             PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL || vars.STAGING_API_URL }}
+#             NEXT_PUBLIC_API_URL=/api
+#             EOF
+            
+#             # Pull and restart containers
+#             docker compose pull
+#             docker compose up -d --remove-orphans
+            
+#             # Wait for health checks
+#             sleep 30
+#             docker compose ps
+
+#   # ===========================================================================
+#   # Deploy to Production
+#   # ===========================================================================
+#   deploy-production:
+#     name: Deploy to Production
+#     runs-on: ubuntu-latest
+#     needs: build
+#     if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+#     environment:
+#       name: production
+#       url: ${{ vars.PRODUCTION_URL }}
+    
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Create deployment package
+#         run: |
+#           mkdir -p deploy-package
+#           cp docker-compose.yml deploy-package/
+#           cp -r deploy/ deploy-package/
+#           cp deploy.sh deploy-package/
+#           tar -czvf deploy-package.tar.gz deploy-package/
+
+#       - name: Copy files to server
+#         uses: appleboy/scp-action@v0.1.7
+#         with:
+#           host: ${{ secrets.DEPLOY_HOST }}
+#           username: ${{ secrets.DEPLOY_USER }}
+#           key: ${{ secrets.DEPLOY_KEY }}
+#           source: "deploy-package.tar.gz"
+#           target: "/tmp/"
+
+#       - name: Deploy to production server
+#         uses: appleboy/ssh-action@v1.0.3
+#         with:
+#           host: ${{ secrets.DEPLOY_HOST }}
+#           username: ${{ secrets.DEPLOY_USER }}
+#           key: ${{ secrets.DEPLOY_KEY }}
+#           script: |
+#             set -e
+            
+#             DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/faq-app' }}"
+            
+#             # Backup current deployment
+#             if [ -d "$DEPLOY_PATH" ]; then
+#               sudo cp -r "$DEPLOY_PATH" "$DEPLOY_PATH.backup.$(date +%Y%m%d_%H%M%S)"
+#             fi
+            
+#             # Extract new deployment
+#             cd /tmp
+#             tar -xzvf deploy-package.tar.gz
+#             sudo mkdir -p "$DEPLOY_PATH"
+#             sudo cp -r deploy-package/* "$DEPLOY_PATH/"
+#             rm -rf deploy-package deploy-package.tar.gz
+            
+#             cd "$DEPLOY_PATH"
+            
+#             # Create/update .env with production secrets
+#             sudo tee .env > /dev/null << 'EOF'
+#             NODE_ENV=production
+#             DB_USER=faquser
+#             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+#             DB_NAME=faq_app
+#             DB_PORT=5432
+#             JWT_SECRET=${{ secrets.JWT_SECRET }}
+#             FRONTEND_URL=${{ vars.PRODUCTION_URL || 'https://faq.yourdomain.com' }}
+#             BACKEND_URL=http://localhost:4004
+#             PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL || vars.PRODUCTION_API_URL }}
+#             BACKEND_PORT=4004
+#             FRONTEND_PORT=3000
+#             NEXT_PUBLIC_API_URL=/api
+#             EOF
+            
+#             # Login to registry
+#             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+#             # Pull latest images
+#             docker compose pull
+            
+#             # Backup database before deployment
+#             if docker ps | grep -q faq-db; then
+#               ./deploy.sh backup || true
+#             fi
+            
+#             # Deploy with zero downtime
+#             docker compose up -d --remove-orphans
+            
+#             # Wait and verify
+#             sleep 45
+            
+#             # Health check
+#             curl -f http://localhost:4004/api/health || exit 1
+#             curl -f http://localhost:3000 || exit 1
+            
+#             echo "Deployment successful!"
+
+#       - name: Notify on success
+#         if: success() && secrets.SLACK_WEBHOOK_URL
+#         uses: slackapi/slack-github-action@v1.25.0
+#         with:
+#           payload: |
+#             {
+#               "text": "✅ FAQ App deployed to production",
+#               "blocks": [
+#                 {
+#                   "type": "section",
+#                   "text": {
+#                     "type": "mrkdwn",
+#                     "text": "✅ *FAQ App* deployed to production\n*Version:* `${{ needs.build.outputs.version }}`\n*Actor:* ${{ github.actor }}"
+#                   }
+#                 }
+#               ]
+#             }
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#       - name: Notify on failure
+#         if: failure() && secrets.SLACK_WEBHOOK_URL
+#         uses: slackapi/slack-github-action@v1.25.0
+#         with:
+#           payload: |
+#             {
+#               "text": "❌ FAQ App deployment failed",
+#               "blocks": [
+#                 {
+#                   "type": "section",
+#                   "text": {
+#                     "type": "mrkdwn",
+#                     "text": "❌ *FAQ App* deployment to production failed\n*Actor:* ${{ github.actor }}\n*Run:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+#                   }
+#                 }
+#               ]
+#             }
+#         env:
+#           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+#   # ===========================================================================
+#   # Cleanup old images
+#   # ===========================================================================
+#   cleanup:
+#     name: Cleanup Old Images
+#     runs-on: ubuntu-latest
+#     needs: [deploy-staging, deploy-production]
+#     if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+#     steps:
+#       - name: Delete old container images
+#         uses: actions/delete-package-versions@v5
+#         with:
+#           package-name: 'faq-app/backend'
+#           package-type: 'container'
+#           min-versions-to-keep: 5
+#           delete-only-untagged-versions: 'true'
+#         continue-on-error: true
+
+#       - name: Delete old frontend images
+#         uses: actions/delete-package-versions@v5
+#         with:
+#           package-name: 'faq-app/frontend'
+#           package-type: 'container'
+#           min-versions-to-keep: 5
+#           delete-only-untagged-versions: 'true'
+#         continue-on-error: true
