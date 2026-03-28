@@ -1,0 +1,43 @@
+<h2>Welcome to <%= appName || 'FAQ Manager' %>! 🎉</h2>
+
+<p>Hi<% if (userName) { %> <strong><%= userName %></strong><% } %>,</p>
+
+<p>Thank you for creating your account. We're excited to have you on board!</p>
+
+<p>With <%= appName || 'FAQ Manager' %>, you can:</p>
+
+<ul style="margin: 16px 0; padding-left: 24px;">
+  <li>Create and manage FAQs for your Shopify store</li>
+  <li>Enable community Q&A with customer questions and answers</li>
+  <li>Moderate content with flexible publishing rules</li>
+  <li>Track engagement with built-in analytics</li>
+  <li>Embed a beautiful FAQ widget on your storefront</li>
+</ul>
+
+<p style="text-align: center;">
+  <a href="<%= dashboardUrl %>" class="btn">Go to Dashboard</a>
+</p>
+
+<hr class="divider">
+
+<h3 style="font-size: 16px; margin-bottom: 12px;">Getting Started</h3>
+
+<p>Here's how to set up your FAQ system:</p>
+
+<ol style="margin: 16px 0; padding-left: 24px; color: #4b5563;">
+  <li><strong>Add your Shopify credentials</strong> — Connect your store in the Credentials page</li>
+  <li><strong>Create categories</strong> — Organize your FAQs by topic</li>
+  <li><strong>Add your first FAQ</strong> — Start building your knowledge base</li>
+  <li><strong>Install the widget</strong> — Copy the embed code to your theme</li>
+</ol>
+
+<% if (verifyEmailUrl) { %>
+<div class="alert-box alert-info">
+  <strong>Verify your email</strong><br>
+  Please verify your email address to unlock all features.
+  <br><br>
+  <a href="<%= verifyEmailUrl %>" class="btn" style="margin: 0;">Verify Email</a>
+</div>
+<% } %>
+
+<p class="muted">If you have any questions, just reply to this email — we're here to help!</p>

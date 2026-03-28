@@ -4,6 +4,7 @@ const prisma = require("../services/prismaClient");
 const contributorService = require("../services/contributorService");
 const settingsService = require("../services/settingsService");
 const productService = require("../services/productService");
+const emailService = require("../services/emailService");
 
 // ---------- Input Validation ----------
 
@@ -123,6 +124,17 @@ router.post("/:identifier/faq", async (req, res, next) => {
         publishedAt: status === "published" ? new Date() : null,
         shopId: shop.id,
       },
+      include: {
+        category: true,
+        contributor: { select: { name: true, email: true, trusted: true } },
+      },
+    });
+
+    // Send email alert for new question (non-blocking)
+    settingsService.getSettings(shop.id).then((settings) => {
+      emailService.sendNewQuestionAlert(shop, question, settings).catch((err) => {
+        console.error("Failed to send new question alert:", err.message);
+      });
     });
 
     res.status(201).json({
@@ -189,6 +201,17 @@ router.post("/:identifier/answer", async (req, res, next) => {
         shopId: shop.id,
         publishedAt: status === "published" ? new Date() : null,
       },
+      include: {
+        question: { select: { id: true, question: true } },
+        contributor: { select: { name: true, email: true, trusted: true } },
+      },
+    });
+
+    // Send email alert for new answer (non-blocking)
+    settingsService.getSettings(shop.id).then((settings) => {
+      emailService.sendNewAnswerAlert(shop, answer, settings).catch((err) => {
+        console.error("Failed to send new answer alert:", err.message);
+      });
     });
 
     res.status(201).json({

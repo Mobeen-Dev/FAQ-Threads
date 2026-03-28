@@ -13,9 +13,13 @@ const settingsRoutes = require("./routes/settings");
 const answerRoutes = require("./routes/answers");
 const voteRoutes = require("./routes/votes");
 const contributorRoutes = require("./routes/contributors");
+const emailRoutes = require("./routes/email");
 const { resolveCorsOptions } = require("./services/corsService");
 const { createRateLimiter } = require("./middleware/rateLimit");
 const errorHandler = require("./middleware/errorHandler");
+const emailService = require("./services/emailService");
+const emailQueueService = require("./services/emailQueueService");
+const emailScheduler = require("./jobs/emailScheduler");
 
 const app = express();
 const PORT = process.env.PORT || 4004;
@@ -68,6 +72,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/answers", answerRoutes);
 app.use("/api/votes", voteRoutes);
 app.use("/api/contributors", contributorRoutes);
+app.use("/api/email", emailRoutes);
 
 // Error handler
 app.use(errorHandler);
@@ -79,8 +84,46 @@ server.timeout = 30000;        // 30s max request time
 server.keepAliveTimeout = 65000; // Slightly higher than typical LB timeout (60s)
 server.headersTimeout = 66000;   // Must be > keepAliveTimeout
 
-server.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+// Initialize services and start server
+async function startServer() {
+  // Initialize email service
+  await emailService.initialize();
+  
+  // Start email queue processor
+  emailQueueService.startProcessor();
+  
+  // Start email scheduler for reports
+  emailScheduler.start();
+
+  server.listen(PORT, () => {
+    console.log(`Backend running on http://localhost:${PORT}`);
+  });
+}
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
+  emailQueueService.stopProcessor();
+  emailScheduler.stop();
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, shutting down gracefully");
+  emailQueueService.stopProcessor();
+  emailScheduler.stop();
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+startServer().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
 });
 
 module.exports = { app, server };

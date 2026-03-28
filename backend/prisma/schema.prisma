@@ -8,13 +8,15 @@ datasource db {
 
 // ─── Admin Users (dashboard owners) ─────────────────────────
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  shops        Shop[]
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  shops         Shop[]
+  emailLogs     EmailLog[]
 }
 
 // ─── Shopify Stores ─────────────────────────────────────────
@@ -35,6 +37,7 @@ model Shop {
   votes             Vote[]
   contributors      StoreContributor[]
   settings          Setting?
+  emailLogs         EmailLog[]
   installedAt       DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -213,4 +216,86 @@ model Setting {
   // Moderation
   autoModeration              Boolean @default(false)
   trustedCustomerAutoPublish  Boolean @default(false)
+
+  // ─── Email Notification Settings ─────────────────────────────
+  // Alert emails
+  emailAlertsEnabled          Boolean @default(true)
+  emailAlertNewQuestion       Boolean @default(true)
+  emailAlertNewAnswer         Boolean @default(true)
+  emailAlertModeration        Boolean @default(true)
+  emailAlertRecipients        String? // Comma-separated email addresses, defaults to notifyEmail
+
+  // Report emails
+  emailReportsEnabled         Boolean @default(false)
+  emailReportFrequency        String  @default("weekly") // daily, weekly, monthly, none
+  emailReportRecipients       String? // Comma-separated email addresses
+  emailReportLastSent         DateTime?
+
+  // Email preferences
+  emailUnsubscribedTypes      String? // Comma-separated list of unsubscribed email types
+}
+
+// ─── Email Logs (audit trail for sent emails) ───────────────
+model EmailLog {
+  id            String    @id @default(cuid())
+  emailType     String    // welcome, verify, password_reset, alert_question, alert_answer, report_daily, etc.
+  recipient     String    // Email address
+  subject       String
+  status        String    @default("pending") // pending, queued, sent, delivered, failed, bounced
+  messageId     String?   // Provider message ID
+  errorMessage  String?   @db.Text
+  metadata      String?   @db.Text // JSON: template vars, related entity IDs
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  bouncedAt     DateTime?
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shopId        String?
+  shop          Shop?     @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([shopId, emailType])
+  @@index([userId, emailType])
+  @@index([recipient])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── Email Queue (for background processing) ─────────────────
+model EmailQueue {
+  id            String    @id @default(cuid())
+  emailType     String
+  recipient     String
+  subject       String
+  templateData  String    @db.Text // JSON: template variables
+  priority      Int       @default(0) // Higher = more urgent
+  status        String    @default("pending") // pending, processing, completed, failed
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(3)
+  lastError     String?   @db.Text
+  scheduledFor  DateTime  @default(now())
+  processedAt   DateTime?
+  emailLogId    String?   // Link to EmailLog after sending
+  idempotencyKey String?  @unique // Prevent duplicate sends
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([priority])
+}
+
+// ─── Used Tokens (prevent token reuse) ───────────────────────
+model UsedToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // SHA-256 hash of the token
+  tokenType String   // password_reset, email_verify, unsubscribe
+  usedAt    DateTime @default(now())
+  expiresAt DateTime // When to auto-cleanup
+
+  @@index([expiresAt])
 }

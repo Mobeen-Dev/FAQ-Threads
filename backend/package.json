@@ -8,7 +8,10 @@
     "dev": "nodemon server.js",
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:generate": "npx prisma generate",
-    "prisma:studio": "npx prisma studio"
+    "prisma:studio": "npx prisma studio",
+    "test": "node --test tests/",
+    "test:email": "node --test tests/email-test.js",
+    "test:send-emails": "node scripts/test-emails.js"
   },
   "keywords": [],
   "author": "",
@@ -20,11 +23,15 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
+    "ejs": "^3.1.10",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
-    "pg": "^8.20.0"
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.20.0",
+    "resend": "^6.9.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",

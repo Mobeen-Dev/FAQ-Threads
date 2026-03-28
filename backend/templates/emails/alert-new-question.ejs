@@ -1,0 +1,40 @@
+<h2>New Question Submitted</h2>
+
+<p>Hi<% if (recipientName) { %> <strong><%= recipientName %></strong><% } %>,</p>
+
+<p>A new question has been submitted to your FAQ system and is waiting for review.</p>
+
+<div style="background-color: #f9fafb; border-left: 4px solid <%= primaryColor || '#6366f1' %>; padding: 16px; margin: 20px 0;">
+  <p style="margin: 0 0 8px 0; font-weight: 600; color: #1a1a1a;">
+    "<%= question %>"
+  </p>
+  <% if (productTitle) { %>
+  <p style="margin: 0; font-size: 14px; color: #6b7280;">
+    📦 Product: <%= productTitle %>
+  </p>
+  <% } %>
+  <% if (categoryName) { %>
+  <p style="margin: 0; font-size: 14px; color: #6b7280;">
+    📁 Category: <%= categoryName %>
+  </p>
+  <% } %>
+</div>
+
+<p><strong>Submitted by:</strong></p>
+<ul style="margin: 8px 0 16px 0; padding-left: 24px; color: #4b5563;">
+  <% if (customerName) { %><li>Name: <%= customerName %></li><% } %>
+  <% if (customerEmail) { %><li>Email: <%= customerEmail %></li><% } %>
+  <li>Source: <%= source || 'Storefront Widget' %></li>
+  <li>Time: <%= new Date(submittedAt || Date.now()).toLocaleString() %></li>
+</ul>
+
+<p style="text-align: center;">
+  <a href="<%= questionUrl || dashboardUrl %>" class="btn">Review Question</a>
+</p>
+
+<hr class="divider">
+
+<p class="muted">
+  You're receiving this because you have question alerts enabled. 
+  <a href="<%= settingsUrl %>">Manage notification preferences</a>
+</p>

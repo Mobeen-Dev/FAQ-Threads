@@ -1,0 +1,42 @@
+<h2>New Answer Submitted</h2>
+
+<p>Hi<% if (recipientName) { %> <strong><%= recipientName %></strong><% } %>,</p>
+
+<p>A new answer has been submitted and is waiting for review.</p>
+
+<div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+  <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280;">
+    <strong>Question:</strong>
+  </p>
+  <p style="margin: 0 0 16px 0; color: #1a1a1a;">
+    "<%= questionText %>"
+  </p>
+  
+  <hr class="divider" style="margin: 16px 0;">
+  
+  <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280;">
+    <strong>New Answer:</strong>
+  </p>
+  <p style="margin: 0; color: #1a1a1a; background-color: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e5e7eb;">
+    <%= answerText.length > 500 ? answerText.substring(0, 500) + '...' : answerText %>
+  </p>
+</div>
+
+<p><strong>Submitted by:</strong></p>
+<ul style="margin: 8px 0 16px 0; padding-left: 24px; color: #4b5563;">
+  <% if (contributorName) { %><li>Name: <%= contributorName %></li><% } %>
+  <% if (contributorEmail) { %><li>Email: <%= contributorEmail %></li><% } %>
+  <% if (isTrusted) { %><li>✓ Trusted Contributor</li><% } %>
+  <li>Time: <%= new Date(submittedAt || Date.now()).toLocaleString() %></li>
+</ul>
+
+<p style="text-align: center;">
+  <a href="<%= answerUrl || dashboardUrl %>" class="btn">Review Answer</a>
+</p>
+
+<hr class="divider">
+
+<p class="muted">
+  You're receiving this because you have answer alerts enabled. 
+  <a href="<%= settingsUrl %>">Manage notification preferences</a>
+</p>

@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const prisma = require("../services/prismaClient");
 const authMiddleware = require("../middleware/auth");
+const emailService = require("../services/emailService");
+const tokenService = require("../services/tokenService");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
@@ -55,9 +57,14 @@ router.post("/signup", async (req, res, next) => {
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
+    // Send welcome email (non-blocking)
+    emailService.sendWelcomeEmail(user).catch((err) => {
+      console.error("Failed to send welcome email:", err.message);
+    });
+
     res.status(201).json({
       token,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
     });
   } catch (error) {
     next(error);
@@ -87,7 +94,7 @@ router.post("/login", async (req, res, next) => {
 
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
     });
   } catch (error) {
     next(error);
@@ -102,6 +109,7 @@ router.get("/me", authMiddleware, async (req, res) => {
       id: user.id,
       email: user.email,
       name: user.name,
+      emailVerified: user.emailVerified,
       shops: user.shops.map((s) => ({
         id: s.id,
         domain: s.domain,
@@ -109,6 +117,193 @@ router.get("/me", authMiddleware, async (req, res) => {
       })),
     },
   });
+});
+
+// ─── Password Reset Flow ────────────────────────────────────────
+
+// Forgot password - request reset email
+router.post("/forgot-password", async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Always return success to prevent email enumeration
+    const successResponse = {
+      success: true,
+      message: "If an account exists with this email, you will receive a password reset link.",
+    };
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Don't reveal that the email doesn't exist
+      return res.json(successResponse);
+    }
+
+    // Send password reset email
+    const context = {
+      ipAddress: req.ip || req.headers["x-forwarded-for"] || "unknown",
+      userAgent: req.get("User-Agent"),
+    };
+
+    emailService.sendPasswordResetEmail(user, context).catch((err) => {
+      console.error("Failed to send password reset email:", err.message);
+    });
+
+    res.json(successResponse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Reset password - set new password with token
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token and password are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
+    }
+
+    // Verify token
+    const result = tokenService.verifyPasswordResetToken(token);
+    if (!result.valid) {
+      return res.status(400).json({ error: result.error || "Invalid or expired reset link" });
+    }
+
+    // Check if token has been used
+    const isUsed = await emailService.isTokenUsed(token);
+    if (isUsed) {
+      return res.status(400).json({ error: "This reset link has already been used" });
+    }
+
+    // Find user
+    const user = await prisma.user.findUnique({ where: { id: result.userId } });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid reset link" });
+    }
+
+    // Verify email matches
+    if (user.email !== result.email) {
+      return res.status(400).json({ error: "Invalid reset link" });
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Mark token as used
+    await emailService.markTokenUsed(token, "password_reset", new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+    // Send confirmation email
+    const context = {
+      ipAddress: req.ip || req.headers["x-forwarded-for"] || "unknown",
+    };
+    emailService.sendPasswordChangedEmail(user, context).catch((err) => {
+      console.error("Failed to send password changed email:", err.message);
+    });
+
+    res.json({ success: true, message: "Password has been reset successfully" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── Email Verification Flow ────────────────────────────────────
+
+// Verify email with token
+router.post("/verify-email", async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Token is required" });
+    }
+
+    // Verify token
+    const result = tokenService.verifyEmailVerifyToken(token);
+    if (!result.valid) {
+      return res.status(400).json({ error: result.error || "Invalid or expired verification link" });
+    }
+
+    // Check if token has been used
+    const isUsed = await emailService.isTokenUsed(token);
+    if (isUsed) {
+      return res.status(400).json({ error: "This verification link has already been used" });
+    }
+
+    // Find and update user
+    const user = await prisma.user.findUnique({ where: { id: result.userId } });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid verification link" });
+    }
+
+    if (user.emailVerified) {
+      return res.json({ success: true, message: "Email already verified" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    });
+
+    // Mark token as used
+    await emailService.markTokenUsed(token, "email_verify", new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+    res.json({ success: true, message: "Email verified successfully" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Change password (authenticated)
+router.post("/change-password", authMiddleware, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = req.user;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters" });
+    }
+
+    // Verify current password
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Send confirmation email
+    const context = {
+      ipAddress: req.ip || req.headers["x-forwarded-for"] || "unknown",
+    };
+    emailService.sendPasswordChangedEmail(user, context).catch((err) => {
+      console.error("Failed to send password changed email:", err.message);
+    });
+
+    res.json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;

@@ -1,0 +1,128 @@
+<h2><%= reportTitle %></h2>
+
+<p>Hi<% if (recipientName) { %> <strong><%= recipientName %></strong><% } %>,</p>
+
+<p>Here's your <%= reportPeriod %> FAQ performance summary for <strong><%= shopName || 'your store' %></strong>.</p>
+
+<p style="color: #6b7280; font-size: 14px;">
+  📅 Period: <%= periodStart %> - <%= periodEnd %>
+</p>
+
+<!-- Stats Overview -->
+<table width="100%" cellpadding="0" cellspacing="0" style="margin: 24px 0;">
+  <tr>
+    <td width="33%" style="text-align: center; padding: 16px; background-color: #f9fafb; border-radius: 6px 0 0 6px;">
+      <div style="font-size: 32px; font-weight: 700; color: <%= primaryColor || '#6366f1' %>;">
+        <%= stats.totalQuestions %>
+      </div>
+      <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-top: 4px;">
+        Questions
+      </div>
+    </td>
+    <td width="33%" style="text-align: center; padding: 16px; background-color: #f9fafb;">
+      <div style="font-size: 32px; font-weight: 700; color: <%= primaryColor || '#6366f1' %>;">
+        <%= stats.totalAnswers %>
+      </div>
+      <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-top: 4px;">
+        Answers
+      </div>
+    </td>
+    <td width="33%" style="text-align: center; padding: 16px; background-color: #f9fafb; border-radius: 0 6px 6px 0;">
+      <div style="font-size: 32px; font-weight: 700; color: <%= primaryColor || '#6366f1' %>;">
+        <%= stats.totalContributors %>
+      </div>
+      <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; margin-top: 4px;">
+        Contributors
+      </div>
+    </td>
+  </tr>
+</table>
+
+<!-- Period Changes -->
+<h3 style="font-size: 16px; margin: 24px 0 12px 0;">📈 This Period</h3>
+
+<table width="100%" cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+  <tr style="background-color: #f9fafb;">
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><strong>Metric</strong></td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;"><strong>Count</strong></td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;"><strong>Change</strong></td>
+  </tr>
+  <tr>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">New Questions</td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;"><%= periodStats.newQuestions %></td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: <%= periodStats.questionsChange >= 0 ? '#10b981' : '#ef4444' %>;">
+      <%= periodStats.questionsChange >= 0 ? '+' : '' %><%= periodStats.questionsChange %>%
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">New Answers</td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;"><%= periodStats.newAnswers %></td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; color: <%= periodStats.answersChange >= 0 ? '#10b981' : '#ef4444' %>;">
+      <%= periodStats.answersChange >= 0 ? '+' : '' %><%= periodStats.answersChange %>%
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">Published</td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;"><%= periodStats.published %></td>
+    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">-</td>
+  </tr>
+  <tr>
+    <td style="padding: 12px;">Pending Review</td>
+    <td style="padding: 12px; text-align: right; font-weight: 600; color: <%= periodStats.pending > 0 ? '#f59e0b' : '#10b981' %>;">
+      <%= periodStats.pending %>
+    </td>
+    <td style="padding: 12px; text-align: right;">-</td>
+  </tr>
+</table>
+
+<% if (periodStats.pending > 0) { %>
+<div class="alert-box alert-warning" style="margin-top: 16px;">
+  <strong>⚠️ Items need attention</strong><br>
+  You have <%= periodStats.pending %> pending item<%= periodStats.pending > 1 ? 's' : '' %> waiting for moderation.
+</div>
+<% } %>
+
+<% if (topQuestions && topQuestions.length > 0) { %>
+<!-- Top Questions -->
+<h3 style="font-size: 16px; margin: 24px 0 12px 0;">🔥 Top Questions</h3>
+
+<% topQuestions.forEach(function(q, index) { %>
+<div style="background-color: #f9fafb; border-radius: 6px; padding: 12px; margin: 8px 0;">
+  <p style="margin: 0; font-size: 14px;">
+    <strong>#<%= index + 1 %></strong>
+    <span style="color: #6b7280; font-size: 12px; margin-left: 8px;">
+      👍 <%= q.voteScore %> votes • 💬 <%= q.answerCount %> answers
+    </span>
+  </p>
+  <p style="margin: 8px 0 0 0; color: #1a1a1a;">
+    <%= q.question.length > 100 ? q.question.substring(0, 100) + '...' : q.question %>
+  </p>
+</div>
+<% }) %>
+<% } %>
+
+<% if (newContributors && newContributors.length > 0) { %>
+<!-- New Contributors -->
+<h3 style="font-size: 16px; margin: 24px 0 12px 0;">👥 New Contributors</h3>
+
+<p style="color: #4b5563;">
+  <%= newContributors.length %> new community member<%= newContributors.length > 1 ? 's' : '' %> joined this period:
+  <% newContributors.slice(0, 5).forEach(function(c, i) { %>
+    <strong><%= c.name || c.email %></strong><%= i < Math.min(newContributors.length, 5) - 1 ? ', ' : '' %>
+  <% }) %>
+  <% if (newContributors.length > 5) { %>
+    and <%= newContributors.length - 5 %> more
+  <% } %>
+</p>
+<% } %>
+
+<p style="text-align: center; margin-top: 24px;">
+  <a href="<%= dashboardUrl %>" class="btn">View Full Dashboard</a>
+</p>
+
+<hr class="divider">
+
+<p class="muted">
+  You're receiving <%= reportPeriod %> reports. 
+  <a href="<%= settingsUrl %>">Change report frequency</a> or <a href="<%= unsubscribeUrl %>">unsubscribe</a>.
+</p>

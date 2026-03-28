@@ -19,7 +19,21 @@ const DEFAULTS = {
   autoPublishIfAnswersLessThan: 0,
   autoModeration: false,
   trustedCustomerAutoPublish: false,
+  // Email notification settings
+  emailAlertsEnabled: true,
+  emailAlertNewQuestion: true,
+  emailAlertNewAnswer: true,
+  emailAlertModeration: true,
+  emailAlertRecipients: null,
+  emailReportsEnabled: false,
+  emailReportFrequency: "weekly",
+  emailReportRecipients: null,
+  emailReportLastSent: null,
+  emailUnsubscribedTypes: null,
 };
+
+// List of all allowed settings keys for update validation
+const ALLOWED_KEYS = Object.keys(DEFAULTS);
 
 function normalizeQuestionPublishingModes(values) {
   const mode = values.autoPublishQuestions
@@ -71,9 +85,8 @@ async function getSettings(shopId) {
 
 async function updateSettings(shopId, data) {
   const current = await getSettings(shopId);
-  const allowed = Object.keys(DEFAULTS);
   const updateData = {};
-  for (const key of allowed) {
+  for (const key of ALLOWED_KEYS) {
     if (data[key] !== undefined) updateData[key] = data[key];
   }
 

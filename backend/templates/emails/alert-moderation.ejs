@@ -1,0 +1,43 @@
+<h2>Content Needs Moderation</h2>
+
+<p>Hi<% if (recipientName) { %> <strong><%= recipientName %></strong><% } %>,</p>
+
+<p>You have <strong><%= pendingCount %></strong> item<%= pendingCount > 1 ? 's' : '' %> pending moderation in your FAQ system.</p>
+
+<% if (pendingQuestions > 0) { %>
+<div class="alert-box alert-info">
+  <strong><%= pendingQuestions %> Question<%= pendingQuestions > 1 ? 's' : '' %></strong> waiting for review
+</div>
+<% } %>
+
+<% if (pendingAnswers > 0) { %>
+<div class="alert-box alert-info">
+  <strong><%= pendingAnswers %> Answer<%= pendingAnswers > 1 ? 's' : '' %></strong> waiting for review
+</div>
+<% } %>
+
+<% if (recentItems && recentItems.length > 0) { %>
+<h3 style="font-size: 16px; margin: 24px 0 12px 0;">Recent Submissions</h3>
+
+<% recentItems.forEach(function(item) { %>
+<div style="background-color: #f9fafb; border-radius: 6px; padding: 12px; margin: 8px 0;">
+  <p style="margin: 0; font-size: 14px;">
+    <strong><%= item.type === 'question' ? '❓' : '💬' %> <%= item.type.charAt(0).toUpperCase() + item.type.slice(1) %></strong>
+    <span style="color: #6b7280; font-size: 12px; margin-left: 8px;"><%= new Date(item.createdAt).toLocaleDateString() %></span>
+  </p>
+  <p style="margin: 8px 0 0 0; color: #4b5563;">
+    <%= item.preview.length > 100 ? item.preview.substring(0, 100) + '...' : item.preview %>
+  </p>
+</div>
+<% }) %>
+<% } %>
+
+<p style="text-align: center; margin-top: 24px;">
+  <a href="<%= dashboardUrl %>?status=pending" class="btn">Review Pending Items</a>
+</p>
+
+<hr class="divider">
+
+<p class="muted">
+  <strong>Tip:</strong> You can enable auto-publishing for trusted contributors or set time-based publishing in your <a href="<%= settingsUrl %>">settings</a>.
+</p>
