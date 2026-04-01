@@ -23,7 +23,7 @@ function VerifyEmailContent() {
       }
 
       try {
-        const response = await backendFetch("/auth/verify-email", {
+        const response = await backendFetch<{ success: boolean; message?: string }>("/auth/verify-email", {
           method: "POST",
           body: JSON.stringify({ token }),
         });

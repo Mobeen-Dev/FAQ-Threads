@@ -9,7 +9,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import { useEffect } from "react";
 import Link from "next/link";
 
-const publicPaths = ["/login", "/signup"];
+const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -55,6 +55,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
               { href: "/contributors", icon: "group" },
               { href: "/analytics", icon: "monitoring" },
               { href: "/settings", icon: "settings" },
+              { href: "/account", icon: "account_circle" },
             ].map((item) => (
               <Link
                 key={item.href}

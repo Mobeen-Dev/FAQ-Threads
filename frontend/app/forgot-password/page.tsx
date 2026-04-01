@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
 
     setIsLoading(true);
     try {
-      const response = await backendFetch("/auth/forgot-password", {
+      const response = await backendFetch<{ success: boolean; message?: string }>("/auth/forgot-password", {
         method: "POST",
         body: JSON.stringify({ email }),
       });

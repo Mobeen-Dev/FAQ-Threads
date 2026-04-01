@@ -14,6 +14,7 @@ const navItems = [
   { href: "/analytics", label: "Analytics", icon: "monitoring" },
   { href: "/credentials", label: "Shopify Store", icon: "storefront" },
   { href: "/settings", label: "Settings", icon: "settings" },
+  { href: "/account", label: "Account", icon: "account_circle" },
 ];
 
 export default function Sidebar() {

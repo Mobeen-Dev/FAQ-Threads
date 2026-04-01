@@ -38,6 +38,28 @@ function writeCached<T>(cacheKey: string, data: T) {
   }
 }
 
+// Export for direct backend API calls (used by auth pages)
+export async function backendFetch<T = Record<string, unknown>>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || error.message || `HTTP ${response.status}`);
+  }
+
+  if (response.status === 204) return {} as T;
+  return response.json();
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const storedToken = getStoredToken();
   const token = storedToken && isTokenUsable(storedToken) ? storedToken : null;
@@ -222,6 +244,41 @@ export interface ShopCredentials {
   widgetHtml: string;
 }
 
+export interface EmailStatus {
+  service: {
+    provider: string;
+    ready: boolean;
+    previewMode: boolean;
+  };
+  queue: {
+    pending: number;
+    failed: number;
+    processing: boolean;
+  };
+  scheduler: {
+    running: boolean;
+    nextRun: string | null;
+  };
+}
+
+export interface EmailLog {
+  id: string;
+  emailType: string;
+  recipient: string;
+  subject: string;
+  status: string;
+  sentAt: string | null;
+  createdAt: string;
+  errorMessage: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string | null;
+  emailVerified: boolean;
+}
+
 export const shopifyApi = {
   // Questions
   getQuestions(params?: Record<string, string>) {
@@ -364,5 +421,38 @@ export const shopifyApi = {
 
   deleteCredentials() {
     return request<void>("/credentials", { method: "DELETE" });
+  },
+
+  // Email & Account
+  getEmailStatus() {
+    return request<EmailStatus>("/email/status");
+  },
+
+  getEmailLogs(params?: Record<string, string>) {
+    const query = params ? "?" + new URLSearchParams(params).toString() : "";
+    return request<{
+      logs: EmailLog[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/email/logs${query}`);
+  },
+
+  sendTestEmail(templateName: string) {
+    return request<{ success: boolean; message: string; skipped?: boolean; reason?: string }>("/email/test", {
+      method: "POST",
+      body: JSON.stringify({ templateName }),
+    });
+  },
+
+  resendVerificationEmail() {
+    return request<{ success: boolean; message: string }>("/email/resend-verification", {
+      method: "POST",
+    });
+  },
+
+  changePassword(currentPassword: string, newPassword: string) {
+    return request<{ success: boolean; message: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
   },
 };

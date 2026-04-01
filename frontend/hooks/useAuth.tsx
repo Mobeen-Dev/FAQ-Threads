@@ -16,6 +16,7 @@ interface User {
   id: string;
   email: string;
   name: string | null;
+  emailVerified: boolean;
   shops: { id: string; domain: string; name: string | null }[];
 }
 
@@ -103,7 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json().catch(() => ({ error: "Login failed" }));
-    if (!res.ok) throw new Error(data.error || "Login failed");
+    
+    // Handle email not verified error specially
+    if (!res.ok) {
+      if (data.code === "EMAIL_NOT_VERIFIED") {
+        const verificationError = new Error(data.error);
+        (verificationError as Error & { code: string; email: string }).code = data.code;
+        (verificationError as Error & { email: string }).email = data.email;
+        throw verificationError;
+      }
+      throw new Error(data.error || "Login failed");
+    }
+    
     if (!data.token || !isTokenUsable(data.token)) {
       throw new Error("Received invalid login session.");
     }
@@ -122,13 +134,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const data = await res.json().catch(() => ({ error: "Signup failed" }));
     if (!res.ok) throw new Error(data.error || "Signup failed");
-    if (!data.token || !isTokenUsable(data.token)) {
-      throw new Error("Received invalid signup session.");
+    
+    // New signup flow: no token returned, user must verify email first
+    if (data.requiresVerification) {
+      // Throw a special error that the signup page can handle
+      const verificationError = new Error(data.message || "Please check your email to verify your account.");
+      (verificationError as Error & { requiresVerification: boolean; email: string }).requiresVerification = true;
+      (verificationError as Error & { email: string }).email = data.email;
+      throw verificationError;
     }
-    setStoredToken(data.token);
-    setCachedUser(data.user);
-    setToken(data.token);
-    setUser(data.user);
+    
+    // Legacy flow (if token is returned)
+    if (data.token && isTokenUsable(data.token)) {
+      setStoredToken(data.token);
+      setCachedUser(data.user);
+      setToken(data.token);
+      setUser(data.user);
+    }
   };
 
   const logout = () => {
