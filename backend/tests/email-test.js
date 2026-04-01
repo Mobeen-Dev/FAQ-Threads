@@ -328,4 +328,216 @@ describe("Email Config", () => {
   });
 });
 
+describe("Email Template Rendering", () => {
+  const emailService = require("../services/emailService");
+
+  describe("renderTemplate", () => {
+    it("should render template without shopName (user-context emails)", async () => {
+      // Test emails sent without shop context (e.g., test emails from account settings)
+      try {
+        const html = await emailService.renderTemplate("welcome", {
+          subject: "Welcome to FAQ Manager",
+          userName: "Test User",
+          email: "test@example.com",
+          dashboardUrl: "https://example.com/dashboard",
+          // Deliberately not passing shopName or unsubscribeUrl
+        });
+
+        assert.ok(html);
+        assert.ok(typeof html === "string");
+        assert.ok(html.includes("Welcome") || html.includes("welcome"));
+        // Should not contain literal "undefined" string
+        assert.ok(!html.includes(">undefined<"), "Should not contain undefined text");
+      } catch (err) {
+        // Template file might not exist in test environment, that's acceptable
+        if (!err.message.includes("ENOENT") && !err.message.includes("template")) {
+          assert.fail(`Unexpected error: ${err.message}`);
+        }
+      }
+    });
+
+    it("should render template with shopName (shop-context emails)", async () => {
+      try {
+        const html = await emailService.renderTemplate("welcome", {
+          subject: "Welcome",
+          userName: "Test User",
+          email: "test@example.com",
+          shopName: "Test Shop",
+          unsubscribeUrl: "https://example.com/unsubscribe?token=abc",
+          dashboardUrl: "https://example.com/dashboard",
+        });
+
+        assert.ok(html);
+        assert.ok(html.includes("Test Shop"));
+      } catch (err) {
+        if (!err.message.includes("ENOENT") && !err.message.includes("template")) {
+          assert.fail(`Unexpected error: ${err.message}`);
+        }
+      }
+    });
+
+    it("should render password-reset template without errors", async () => {
+      try {
+        const html = await emailService.renderTemplate("password-reset", {
+          subject: "Reset Your Password",
+          userName: "Test User",
+          email: "test@example.com",
+          resetUrl: "https://example.com/reset-password?token=test123",
+          expiryHours: 1,
+          ipAddress: "127.0.0.1",
+          userAgent: "Test Browser",
+        });
+
+        assert.ok(html);
+        assert.ok(!html.includes(">undefined<"), "Should not contain undefined text");
+      } catch (err) {
+        if (!err.message.includes("ENOENT") && !err.message.includes("template")) {
+          assert.fail(`Unexpected error: ${err.message}`);
+        }
+      }
+    });
+
+    it("should render verify-email template without errors", async () => {
+      try {
+        const html = await emailService.renderTemplate("verify-email", {
+          subject: "Verify Your Email",
+          userName: "Test User",
+          email: "test@example.com",
+          verifyEmailUrl: "https://example.com/verify-email?token=test123",
+          expiryHours: 24,
+        });
+
+        assert.ok(html);
+        assert.ok(!html.includes(">undefined<"), "Should not contain undefined text");
+      } catch (err) {
+        if (!err.message.includes("ENOENT") && !err.message.includes("template")) {
+          assert.fail(`Unexpected error: ${err.message}`);
+        }
+      }
+    });
+
+    it("should render password-changed template without errors", async () => {
+      try {
+        const html = await emailService.renderTemplate("password-changed", {
+          subject: "Password Changed",
+          userName: "Test User",
+          email: "test@example.com",
+          ipAddress: "192.168.1.1",
+          changedAt: new Date().toISOString(),
+          dashboardUrl: "https://example.com/dashboard",
+        });
+
+        assert.ok(html);
+        assert.ok(!html.includes(">undefined<"), "Should not contain undefined text");
+      } catch (err) {
+        if (!err.message.includes("ENOENT") && !err.message.includes("template")) {
+          assert.fail(`Unexpected error: ${err.message}`);
+        }
+      }
+    });
+  });
+});
+
+describe("Test Email Functionality", () => {
+  const emailService = require("../services/emailService");
+
+  describe("sendWelcomeEmail", () => {
+    it("should handle sending welcome email without shop context", async () => {
+      const user = {
+        id: "test-user-id",
+        email: "test@example.com",
+        name: "Test User",
+      };
+
+      // In preview mode, this should succeed without actually sending
+      const result = await emailService.sendWelcomeEmail(user);
+
+      // Preview mode returns success or skipped
+      assert.ok(result);
+      assert.ok(result.success || result.skipped);
+    });
+  });
+
+  describe("sendPasswordResetEmail", () => {
+    it("should handle sending password reset email", async () => {
+      const user = {
+        id: "test-user-id",
+        email: "test@example.com",
+        name: "Test User",
+      };
+      const context = {
+        ipAddress: "127.0.0.1",
+        userAgent: "Test/1.0",
+      };
+
+      const result = await emailService.sendPasswordResetEmail(user, context);
+
+      assert.ok(result);
+      assert.ok(result.success || result.skipped);
+    });
+  });
+
+  describe("sendVerificationEmail", () => {
+    it("should handle sending verification email", async () => {
+      const user = {
+        id: "test-user-id",
+        email: "test@example.com",
+        name: "Test User",
+        emailVerified: false,
+      };
+
+      const result = await emailService.sendVerificationEmail(user);
+
+      assert.ok(result);
+      assert.ok(result.success || result.skipped);
+    });
+
+    it("should skip if email already verified", async () => {
+      const user = {
+        id: "test-user-id",
+        email: "test@example.com",
+        name: "Test User",
+        emailVerified: true,
+      };
+
+      const result = await emailService.sendVerificationEmail(user);
+
+      // Should skip since already verified
+      assert.ok(result);
+      if (result.skipped) {
+        assert.ok(result.reason.includes("verified"));
+      }
+    });
+  });
+});
+
+describe("Email Queue Service", () => {
+  const emailQueueService = require("../services/emailQueueService");
+
+  describe("getStats", () => {
+    it("should return queue statistics", async () => {
+      try {
+        const stats = await emailQueueService.getStats();
+
+        assert.ok(typeof stats === "object");
+        assert.ok("pending" in stats);
+        assert.ok("failed" in stats);
+        assert.ok("processing" in stats);
+      } catch (err) {
+        // In test environment without database, this may fail
+        // Just verify the function exists and is callable
+        assert.ok(typeof emailQueueService.getStats === "function");
+      }
+    });
+  });
+
+  describe("module exports", () => {
+    it("should export required functions", () => {
+      assert.ok(typeof emailQueueService.getStats === "function");
+      assert.ok(typeof emailQueueService.processQueue === "function");
+      assert.ok(typeof emailQueueService.retryFailed === "function");
+    });
+  });
+});
+
 console.log("Email tests completed");

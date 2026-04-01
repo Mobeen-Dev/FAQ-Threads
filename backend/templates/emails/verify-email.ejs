@@ -1,6 +1,6 @@
 <h2>Verify Your Email Address</h2>
 
-<p>Hi<% if (userName) { %> <strong><%= userName %></strong><% } %>,</p>
+<p>Hi<% if (typeof userName !== 'undefined' && userName) { %> <strong><%= userName %></strong><% } %>,</p>
 
 <p>Please verify your email address to complete your account setup and unlock all features.</p>
 

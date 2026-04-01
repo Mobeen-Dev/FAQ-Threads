@@ -72,8 +72,10 @@ async function renderTemplate(templateName, data) {
     settingsUrl: emailConfig.getSettingsUrl(),
   });
 
-  // Render base with content
+  // Render base with content (provide defaults for optional fields)
   return ejs.render(baseTemplate, {
+    shopName: null,
+    unsubscribeUrl: null,
     ...data,
     content,
     subject: data.subject || "Notification",

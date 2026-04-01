@@ -1,6 +1,6 @@
 <h2>Welcome to <%= appName || 'FAQ Manager' %>! 🎉</h2>
 
-<p>Hi<% if (userName) { %> <strong><%= userName %></strong><% } %>,</p>
+<p>Hi<% if (typeof userName !== 'undefined' && userName) { %> <strong><%= userName %></strong><% } %>,</p>
 
 <p>Thank you for creating your account. We're excited to have you on board!</p>
 
@@ -31,7 +31,7 @@
   <li><strong>Install the widget</strong> — Copy the embed code to your theme</li>
 </ol>
 
-<% if (verifyEmailUrl) { %>
+<% if (typeof verifyEmailUrl !== 'undefined' && verifyEmailUrl) { %>
 <div class="alert-box alert-info">
   <strong>Verify your email</strong><br>
   Please verify your email address to unlock all features.

@@ -55,16 +55,30 @@ router.post("/signup", async (req, res, next) => {
       data: { email, passwordHash, name },
     });
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    // Send welcome email first, then verification email (non-blocking)
+    (async () => {
+      try {
+        await emailService.sendWelcomeEmail(user);
+      } catch (err) {
+        console.error("Failed to send welcome email:", err.message);
+      }
+      
+      // Small delay before sending verification email
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      try {
+        await emailService.sendVerificationEmail(user);
+      } catch (err) {
+        console.error("Failed to send verification email:", err.message);
+      }
+    })();
 
-    // Send welcome email (non-blocking)
-    emailService.sendWelcomeEmail(user).catch((err) => {
-      console.error("Failed to send welcome email:", err.message);
-    });
-
+    // Don't return a token - user must verify email first
     res.status(201).json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified },
+      success: true,
+      message: "Account created! Please check your email to verify your account.",
+      requiresVerification: true,
+      email: user.email
     });
   } catch (error) {
     next(error);
@@ -88,6 +102,15 @@ router.post("/login", async (req, res, next) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Block unverified users
+    if (!user.emailVerified) {
+      return res.status(403).json({ 
+        error: "Please verify your email before signing in",
+        code: "EMAIL_NOT_VERIFIED",
+        email: user.email
+      });
     }
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -153,6 +176,36 @@ router.post("/forgot-password", async (req, res, next) => {
     });
 
     res.json(successResponse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Resend verification email
+router.post("/resend-verification", async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    // Don't reveal if user exists or not for security
+    if (!user) {
+      return res.json({ success: true, message: "If this email exists, a verification link has been sent." });
+    }
+
+    // If already verified, still return success
+    if (user.emailVerified) {
+      return res.json({ success: true, message: "Email is already verified. You can sign in." });
+    }
+
+    // Send verification email
+    await emailService.sendVerificationEmail(user);
+
+    res.json({ success: true, message: "Verification email sent! Please check your inbox." });
   } catch (error) {
     next(error);
   }
@@ -235,20 +288,26 @@ router.post("/verify-email", async (req, res, next) => {
       return res.status(400).json({ error: result.error || "Invalid or expired verification link" });
     }
 
-    // Check if token has been used
-    const isUsed = await emailService.isTokenUsed(token);
-    if (isUsed) {
-      return res.status(400).json({ error: "This verification link has already been used" });
-    }
-
-    // Find and update user
+    // Find user first to check if already verified
     const user = await prisma.user.findUnique({ where: { id: result.userId } });
     if (!user) {
       return res.status(400).json({ error: "Invalid verification link" });
     }
 
+    // If already verified, return success (don't error about token being used)
     if (user.emailVerified) {
-      return res.json({ success: true, message: "Email already verified" });
+      return res.json({ success: true, message: "Email already verified! You can now sign in.", alreadyVerified: true });
+    }
+
+    // Check if token has been used (only if not already verified)
+    const isUsed = await emailService.isTokenUsed(token);
+    if (isUsed) {
+      // Double-check if the user is verified (race condition)
+      const updatedUser = await prisma.user.findUnique({ where: { id: result.userId } });
+      if (updatedUser?.emailVerified) {
+        return res.json({ success: true, message: "Email already verified! You can now sign in.", alreadyVerified: true });
+      }
+      return res.status(400).json({ error: "This verification link has already been used" });
     }
 
     await prisma.user.update({
@@ -259,7 +318,7 @@ router.post("/verify-email", async (req, res, next) => {
     // Mark token as used
     await emailService.markTokenUsed(token, "email_verify", new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-    res.json({ success: true, message: "Email verified successfully" });
+    res.json({ success: true, message: "Email verified successfully! You can now sign in." });
   } catch (error) {
     next(error);
   }

@@ -220,11 +220,11 @@
       
       <!-- Footer -->
       <div class="email-footer">
-        <% if (shopName) { %>
+        <% if (typeof shopName !== 'undefined' && shopName) { %>
         <p><strong><%= shopName %></strong></p>
         <% } %>
-        <p>Powered by <%= appName || 'FAQ Manager' %></p>
-        <% if (unsubscribeUrl) { %>
+        <p>Powered by <%= (typeof appName !== 'undefined' && appName) ? appName : 'FAQ Manager' %></p>
+        <% if (typeof unsubscribeUrl !== 'undefined' && unsubscribeUrl) { %>
         <p><a href="<%= unsubscribeUrl %>">Unsubscribe</a> from these emails</p>
         <% } %>
         <p class="muted">© <%= new Date().getFullYear() %> All rights reserved.</p>

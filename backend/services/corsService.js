@@ -51,12 +51,12 @@ async function resolveCorsOptions(req) {
   const origin = req.headers.origin;
 
   // Allow non-browser requests (no Origin header), such as server-to-server webhooks and tests.
-  if (!origin) return { origin: true };
+  if (!origin) return { origin: true, credentials: true };
 
   // Webhook endpoints are public by design for storefront usage, so allow any browser origin.
-  if (extractWebhookUserId(req.path)) return { origin: true };
+  if (extractWebhookUserId(req.path)) return { origin: true, credentials: true };
 
-  if (isStaticOriginAllowed(origin)) return { origin: true };
+  if (isStaticOriginAllowed(origin)) return { origin: true, credentials: true };
 
   return { origin: false };
 }
