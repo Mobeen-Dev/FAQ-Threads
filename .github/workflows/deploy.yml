@@ -20,7 +20,7 @@ name: CI/CD Pipeline Deploy
 
 on:
   push:
-    branches: [ master, deploy ]
+    branches: [ deploy ]
   workflow_dispatch: # Manual trigger button in GitHub UI
 
 jobs:
