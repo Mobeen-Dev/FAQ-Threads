@@ -525,7 +525,7 @@ jobs:
 #             BACKEND_URL=http://localhost:4004
 #             PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL || vars.PRODUCTION_API_URL }}
 #             BACKEND_PORT=4004
-#             FRONTEND_PORT=3000
+#             FRONTEND_PORT=3004
 #             NEXT_PUBLIC_API_URL=/api
 #             EOF
             
