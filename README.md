@@ -208,12 +208,24 @@ Shop owners get their webhook URL and embeddable widget HTML from the **Credenti
 
 ## CI/CD and Deployment
 
-GitHub Actions workflows are configured for CI and deploy-branch CD:
+A minimal, production-ready CI/CD pipeline deploys the application to a custom Ubuntu server via GitHub Actions.
 
-- CI + build checks on `main` and `deploy`
-- Automatic server deployment on pushes to `deploy`
+**Quick Start:**
+- 📖 [QUICK_START_CICD.md](./QUICK_START_CICD.md) - Get started in 10 minutes
+- 📋 [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) - Step-by-step setup checklist
 
-See deployment setup:
+**Documentation:**
+- 📚 [CICD_SETUP.md](./CICD_SETUP.md) - Complete setup guide with troubleshooting
+- 🔧 [CICD_IMPLEMENTATION.md](./CICD_IMPLEMENTATION.md) - Technical overview and architecture
+- ✅ [IMPLEMENTATION_SUMMARY.md](./IMPLEMENTATION_SUMMARY.md) - Features and requirements
 
-- `deploy/README.md`
-- `.github/workflows/ci-cd.yml`
+**Workflow:**
+- `.github/workflows/deploy.yml` - GitHub Actions workflow
+
+**Features:**
+- ✅ Deploys to Ubuntu server via SSH
+- ✅ Handles environment variables from GitHub Secrets
+- ✅ Builds Docker images and manages containers
+- ✅ Works for first-time and subsequent deployments
+- ✅ Clear, step-by-step logging
+- ✅ Automatic on push to `main`/`deploy` or manual trigger

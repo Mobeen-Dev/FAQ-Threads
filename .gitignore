@@ -31,6 +31,7 @@ Thumbs.db
 logs
 *.log
 chat.md
+*.md
 ui-extension/chat.txt
 deploy/.env.production
 # Database

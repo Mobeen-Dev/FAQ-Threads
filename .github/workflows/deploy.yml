@@ -1,22 +1,21 @@
 # =============================================================================
-# FAQ App - CI/CD Pipeline
+# FAQ App - Production Deployment Pipeline
 # =============================================================================
-# This workflow builds, tests, and deploys the FAQ App
+# This workflow deploys the FAQ App using a self-hosted GitHub Actions runner
+#
+# Prerequisites:
+#   - Self-hosted runner configured on your Ubuntu server
+#   - Docker and Docker Compose installed on the server
+#   - Runner has access to repository
 #
 # Required GitHub Secrets:
-#   - DB_PASSWORD: PostgreSQL password
-#   - JWT_SECRET: JWT signing secret (min 32 chars)
-#   - DEPLOY_HOST: Server IP or hostname
-#   - DEPLOY_USER: SSH username for deployment
-#   - DEPLOY_KEY: SSH private key for deployment
-#   - DEPLOY_PATH: Path on server (e.g., /opt/faq-app)
+#   - ENV_PRODUCTION: Complete .env file content (all environment variables)
 #
 # Optional Secrets:
-#   - DOCKER_REGISTRY: Custom registry (default: ghcr.io)
-#   - PUBLIC_BACKEND_URL: Public API URL
-#   - SLACK_WEBHOOK_URL: For deployment notifications
+#   - SLACK_WEBHOOK_URL: For deployment notifications (optional)
 # =============================================================================
-name: CI/CD Pipeline Deploy
+
+name: 🚀 Deploy FAQ App
 
 on:
   push:
@@ -25,13 +24,224 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, Linux, X64]
+    name: Deploy to Production
+    runs-on: self-hosted
     
     steps:
-    - name: 📥 Checkout Code
-      uses: actions/checkout@v4
-    - name: Debug info
-      run: echo "Branch is ${{ github.ref }} / ${{ github.head_ref }}"
+      # -----------------------------------------------------------------------
+      # Step 1: Checkout code
+      # -----------------------------------------------------------------------
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+      
+      # -----------------------------------------------------------------------
+      # Step 2: Create environment file
+      # -----------------------------------------------------------------------
+      - name: 🔧 Configure Environment Variables
+        run: |
+          echo "Creating .env file from GitHub Secrets..."
+          cat > .env << 'EOF'
+          ${{ secrets.ENV_PRODUCTION }}
+          EOF
+          
+          # Validate .env file
+          if [ ! -s .env ]; then
+            echo "❌ ERROR: .env file is empty or not created"
+            exit 1
+          fi
+          
+          echo "✅ Environment file created successfully"
+          
+          # Validate required variables
+          REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "DB_USER" "DB_NAME")
+          MISSING_VARS=()
+          
+          for var in "${REQUIRED_VARS[@]}"; do
+            if ! grep -q "^${var}=" .env; then
+              MISSING_VARS+=("$var")
+            fi
+          done
+          
+          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+            echo "⚠️  WARNING: Missing required variables: ${MISSING_VARS[*]}"
+          else
+            echo "✅ All required variables validated"
+          fi
+      
+      # -----------------------------------------------------------------------
+      # Step 3: Stop current services
+      # -----------------------------------------------------------------------
+      - name: 🛑 Stop Current Services
+        run: |
+          echo "Stopping project-specific services..."
+          docker stop faq-db faq-backend faq-frontend 2>/dev/null || echo "Containers not running"
+          docker rm faq-db faq-backend faq-frontend 2>/dev/null || echo "Containers not found"
+      
+      # -----------------------------------------------------------------------
+      # Step 4: Clean up old images (optional)
+      # -----------------------------------------------------------------------
+      - name: 🧹 Clean Up Old Images
+        run: |
+          echo "Cleaning up old images..."
+          docker system prune -f || true
+      
+      # -----------------------------------------------------------------------
+      # Step 5: Build and start services
+      # -----------------------------------------------------------------------
+      - name: 🏗️ Build and Start Services
+        run: |
+          echo "Building and starting services..."
+          
+          # Determine Docker Compose command
+          if docker compose version &> /dev/null; then
+            DOCKER_COMPOSE="docker compose"
+          else
+            DOCKER_COMPOSE="docker-compose"
+          fi
+          
+          echo "Using: $DOCKER_COMPOSE"
+          $DOCKER_COMPOSE up -d --build
+      
+      # -----------------------------------------------------------------------
+      # Step 6: Wait for services to initialize
+      # -----------------------------------------------------------------------
+      - name: ⏱️ Wait for Services to Start
+        run: |
+          echo "Waiting for services to initialize..."
+          sleep 30
+      
+      # -----------------------------------------------------------------------
+      # Step 7: Check database health
+      # -----------------------------------------------------------------------
+      - name: 🗄️ Check Database Health
+        run: |
+          echo "Checking PostgreSQL health..."
+          for i in {1..12}; do
+            if docker exec faq-db pg_isready -U faquser 2>/dev/null; then
+              echo "✅ Database is healthy!"
+              break
+            fi
+            echo "Attempt $i/12: Database not ready, waiting 10s..."
+            sleep 10
+            if [ $i -eq 12 ]; then
+              echo "❌ Database health check failed!"
+              exit 1
+            fi
+          done
+      
+      # -----------------------------------------------------------------------
+      # Step 8: Check backend health
+      # -----------------------------------------------------------------------
+      - name: 🏥 Check Backend Health
+        run: |
+          echo "Checking Backend API health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:4004/api/health 2>/dev/null || curl -f http://localhost:4004 2>/dev/null; then
+              echo "✅ Backend is healthy!"
+              break
+            fi
+            echo "Attempt $i/10: Backend not ready, waiting 10s..."
+            sleep 10
+            if [ $i -eq 10 ]; then
+              echo "❌ Backend health check failed!"
+              exit 1
+            fi
+          done
+      
+      # -----------------------------------------------------------------------
+      # Step 9: Check frontend health
+      # -----------------------------------------------------------------------
+      - name: 🌐 Check Frontend Health
+        run: |
+          echo "Checking Frontend health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:3000 2>/dev/null || curl -f http://localhost:3004 2>/dev/null; then
+              echo "✅ Frontend is healthy!"
+              break
+            fi
+            echo "Attempt $i/10: Frontend not ready, waiting 10s..."
+            sleep 10
+            if [ $i -eq 10 ]; then
+              echo "❌ Frontend health check failed!"
+              exit 1
+            fi
+          done
+      
+      # -----------------------------------------------------------------------
+      # Step 10: Deployment success
+      # -----------------------------------------------------------------------
+      - name: ✅ Deployment Success
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎉 Deployment completed successfully!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "📝 Deployment Summary:"
+          echo "   • Commit: $(git rev-parse --short HEAD)"
+          echo "   • Branch: ${{ github.ref_name }}"
+          echo "   • Timestamp: $(date)"
+          echo ""
+          echo "🌐 Service URLs:"
+          echo "   • Frontend: http://localhost:3000"
+          echo "   • Backend:  http://localhost:4004"
+          echo "   • Database: localhost:5432"
+          echo ""
+          echo "📊 Container Status:"
+          
+          # Determine Docker Compose command
+          if docker compose version &> /dev/null; then
+            docker compose ps
+          else
+            docker-compose ps
+          fi
+      
+      # -----------------------------------------------------------------------
+      # Step 11: Rollback on failure
+      # -----------------------------------------------------------------------
+      - name: 🚨 Rollback on Failure
+        if: failure()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "💥 Deployment failed! Attempting rollback..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Determine Docker Compose command
+          if docker compose version &> /dev/null; then
+            DOCKER_COMPOSE="docker compose"
+          else
+            DOCKER_COMPOSE="docker-compose"
+          fi
+          
+          # Stop failed deployment
+          $DOCKER_COMPOSE down
+          
+          # Try to restore from backup images
+          if docker image ls | grep -q "faq.*backup"; then
+            echo "Found backup images, attempting rollback..."
+            
+            # Tag backup images as latest
+            for service in backend frontend; do
+              if docker image ls | grep -q "faq-${service}.*backup"; then
+                echo "Restoring ${service} from backup..."
+                docker tag faq-${service}:backup faq-${service}:latest
+              fi
+            done
+            
+            # Start with backup images
+            $DOCKER_COMPOSE up -d
+            sleep 30
+            
+            # Verify rollback
+            if curl -f http://localhost:4004 2>/dev/null && curl -f http://localhost:3000 2>/dev/null; then
+              echo "✅ Rollback successful!"
+            else
+              echo "❌ Rollback failed! Manual intervention required."
+              exit 1
+            fi
+          else
+            echo "⚠️  No backup images available. Manual intervention required."
+            exit 1
+          fi
 
 # name: CI/CD Pipeline
 
