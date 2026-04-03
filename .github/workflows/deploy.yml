@@ -155,7 +155,7 @@ jobs:
         run: |
           echo "Checking Frontend health..."
           for i in {1..10}; do
-            if curl -f http://localhost:3000 2>/dev/null || curl -f http://localhost:3004 2>/dev/null; then
+            if curl -f http://localhost:3004 2>/dev/null || curl -f http://localhost:3004 2>/dev/null; then
               echo "✅ Frontend is healthy!"
               break
             fi
@@ -182,7 +182,7 @@ jobs:
           echo "   • Timestamp: $(date)"
           echo ""
           echo "🌐 Service URLs:"
-          echo "   • Frontend: http://localhost:3000"
+          echo "   • Frontend: http://localhost:3004"
           echo "   • Backend:  http://localhost:4004"
           echo "   • Database: localhost:5432"
           echo ""
@@ -232,7 +232,7 @@ jobs:
             sleep 30
             
             # Verify rollback
-            if curl -f http://localhost:4004 2>/dev/null && curl -f http://localhost:3000 2>/dev/null; then
+            if curl -f http://localhost:4004 2>/dev/null && curl -f http://localhost:3004 2>/dev/null; then
               echo "✅ Rollback successful!"
             else
               echo "❌ Rollback failed! Manual intervention required."
@@ -441,7 +441,7 @@ jobs:
 #             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 #             DB_NAME=faq_app
 #             JWT_SECRET=${{ secrets.JWT_SECRET }}
-#             FRONTEND_URL=${{ vars.STAGING_URL || 'http://localhost:3000' }}
+#             FRONTEND_URL=${{ vars.STAGING_URL || 'http://localhost:3004' }}
 #             BACKEND_URL=${{ vars.STAGING_API_URL || 'http://localhost:4004' }}
 #             PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL || vars.STAGING_API_URL }}
 #             NEXT_PUBLIC_API_URL=/api
@@ -548,7 +548,7 @@ jobs:
             
 #             # Health check
 #             curl -f http://localhost:4004/api/health || exit 1
-#             curl -f http://localhost:3000 || exit 1
+#             curl -f http://localhost:3004 || exit 1
             
 #             echo "Deployment successful!"
 
