@@ -64,20 +64,52 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_NAME=${{ secrets.DB_NAME }}
           DB_PORT=${{ secrets.DB_PORT }}
+          DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@db:5432/${{ secrets.DB_NAME }}?schema=public
           
           # Backend Configuration
           NODE_ENV=${{ secrets.NODE_ENV || 'production' }}
+          PORT=4004
           BACKEND_PORT=${{ secrets.BACKEND_PORT }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN || '7d' }}
           
           # URLs
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           BACKEND_URL=${{ secrets.BACKEND_URL }}
           PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL }}
+          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
           
           # Frontend Configuration
           FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}
           NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          
+          # Email Configuration (Optional - for email features)
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT || '587' }}
+          SMTP_SECURE=${{ secrets.SMTP_SECURE || 'false' }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASS=${{ secrets.SMTP_PASS }}
+          EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME || 'FAQ Manager' }}
+          EMAIL_FROM_ADDRESS=${{ secrets.EMAIL_FROM_ADDRESS }}
+          EMAIL_REPLY_TO=${{ secrets.EMAIL_REPLY_TO }}
+          EMAIL_TOKEN_SECRET=${{ secrets.EMAIL_TOKEN_SECRET }}
+          PASSWORD_RESET_EXPIRY_HOURS=${{ secrets.PASSWORD_RESET_EXPIRY_HOURS || '1' }}
+          EMAIL_VERIFY_EXPIRY_HOURS=${{ secrets.EMAIL_VERIFY_EXPIRY_HOURS || '24' }}
+          EMAIL_QUEUE_ENABLED=${{ secrets.EMAIL_QUEUE_ENABLED || 'true' }}
+          EMAIL_RETRY_ATTEMPTS=${{ secrets.EMAIL_RETRY_ATTEMPTS || '3' }}
+          EMAIL_RETRY_DELAY_MS=${{ secrets.EMAIL_RETRY_DELAY_MS || '60000' }}
+          EMAIL_BATCH_SIZE=${{ secrets.EMAIL_BATCH_SIZE || '10' }}
+          ENABLE_REPORT_EMAILS=${{ secrets.ENABLE_REPORT_EMAILS || 'true' }}
+          REPORT_CRON_DAILY=${{ secrets.REPORT_CRON_DAILY || '0 8 * * *' }}
+          REPORT_CRON_WEEKLY=${{ secrets.REPORT_CRON_WEEKLY || '0 8 * * 1' }}
+          REPORT_CRON_MONTHLY=${{ secrets.REPORT_CRON_MONTHLY || '0 8 1 * *' }}
+          REPORT_TIMEZONE=${{ secrets.REPORT_TIMEZONE || 'UTC' }}
+          SEND_WELCOME_EMAIL=${{ secrets.SEND_WELCOME_EMAIL || 'true' }}
+          REQUIRE_EMAIL_VERIFICATION=${{ secrets.REQUIRE_EMAIL_VERIFICATION || 'false' }}
+          ENABLE_UNSUBSCRIBE=${{ secrets.ENABLE_UNSUBSCRIBE || 'true' }}
+          EMAIL_PREVIEW_MODE=${{ secrets.EMAIL_PREVIEW_MODE || 'false' }}
+          EMAIL_LOG_LEVEL=${{ secrets.EMAIL_LOG_LEVEL || 'info' }}
           EOF
           
           # Validate .env file
@@ -91,7 +123,7 @@ jobs:
           
           # Validate required variables
           echo "Validating required variables..."
-          REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "DB_USER" "DB_NAME")
+          REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "DB_USER" "DB_NAME" "FRONTEND_URL")
           MISSING_VARS=()
           
           for var in "${REQUIRED_VARS[@]}"; do
