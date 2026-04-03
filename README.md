@@ -4,7 +4,7 @@ A full-stack FAQ management application built for Shopify stores with community 
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS
 - **Backend**: Node.js, Express.js 5
 - **Database**: PostgreSQL with Prisma ORM 7
 - **Storefront**: Shopify Theme App Extension (Liquid + Vanilla JS)
