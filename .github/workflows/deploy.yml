@@ -8,8 +8,26 @@
 #   - Docker and Docker Compose installed on the server
 #   - Runner has access to repository
 #
-# Required GitHub Secrets:
-#   - ENV_PRODUCTION: Complete .env file content (all environment variables)
+# Required GitHub Secrets (Repository → Settings → Secrets → Actions):
+#   Database:
+#     - DB_USER: PostgreSQL username (e.g., faquser)
+#     - DB_PASSWORD: PostgreSQL password (strong, 32+ chars)
+#     - DB_NAME: Database name (e.g., faq_app)
+#     - DB_PORT: Database port (e.g., 5434)
+#   
+#   Backend:
+#     - NODE_ENV: Environment (production)
+#     - BACKEND_PORT: Backend API port (e.g., 4004)
+#     - JWT_SECRET: JWT signing secret (64+ chars)
+#   
+#   URLs:
+#     - FRONTEND_URL: Public frontend URL
+#     - BACKEND_URL: Internal backend URL (http://localhost:4004)
+#     - PUBLIC_BACKEND_URL: Public backend API URL
+#   
+#   Frontend:
+#     - FRONTEND_PORT: Frontend port (e.g., 3004)
+#     - NEXT_PUBLIC_API_URL: Browser-accessible API URL
 #
 # Optional Secrets:
 #   - SLACK_WEBHOOK_URL: For deployment notifications (optional)
@@ -35,13 +53,31 @@ jobs:
         uses: actions/checkout@v4
       
       # -----------------------------------------------------------------------
-      # Step 2: Create environment file
+      # Step 2: Create environment file from individual secrets
       # -----------------------------------------------------------------------
       - name: 🔧 Configure Environment Variables
         run: |
           echo "Creating .env file from GitHub Secrets..."
-          cat > .env << 'EOF'
-          ${{ secrets.ENV_PRODUCTION }}
+          cat > .env << EOF
+          # Database Configuration
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          
+          # Backend Configuration
+          NODE_ENV=${{ secrets.NODE_ENV || 'production' }}
+          BACKEND_PORT=${{ secrets.BACKEND_PORT }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          
+          # URLs
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          BACKEND_URL=${{ secrets.BACKEND_URL }}
+          PUBLIC_BACKEND_URL=${{ secrets.PUBLIC_BACKEND_URL }}
+          
+          # Frontend Configuration
+          FRONTEND_PORT=${{ secrets.FRONTEND_PORT }}
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
           EOF
           
           # Validate .env file
@@ -51,31 +87,47 @@ jobs:
           fi
           
           echo "✅ Environment file created successfully"
+          echo "File size: $(stat -c%s .env 2>/dev/null || stat -f%z .env) bytes"
           
           # Validate required variables
+          echo "Validating required variables..."
           REQUIRED_VARS=("DB_PASSWORD" "JWT_SECRET" "DB_USER" "DB_NAME")
           MISSING_VARS=()
           
           for var in "${REQUIRED_VARS[@]}"; do
-            if ! grep -q "^${var}=" .env; then
+            if ! grep -q "^${var}=" .env || grep -q "^${var}=$" .env; then
               MISSING_VARS+=("$var")
             fi
           done
           
           if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-            echo "⚠️  WARNING: Missing required variables: ${MISSING_VARS[*]}"
+            echo "❌ ERROR: Missing or empty required variables: ${MISSING_VARS[*]}"
+            echo "Please add these secrets in GitHub: Settings → Secrets → Actions"
+            exit 1
           else
             echo "✅ All required variables validated"
           fi
       
       # -----------------------------------------------------------------------
-      # Step 3: Stop current services
+      # Step 3: Stop current services and free ports
       # -----------------------------------------------------------------------
       - name: 🛑 Stop Current Services
         run: |
           echo "Stopping project-specific services..."
           docker stop faq-db faq-backend faq-frontend 2>/dev/null || echo "Containers not running"
           docker rm faq-db faq-backend faq-frontend 2>/dev/null || echo "Containers not found"
+          
+          # Check for any processes using the required ports
+          echo "Checking for port conflicts..."
+          for port in 3000 3004 4004 5432 5434; do
+            if sudo lsof -ti:$port >/dev/null 2>&1; then
+              echo "⚠️  Port $port is in use, attempting to free it..."
+              # Kill any Docker containers using these ports
+              sudo docker ps --filter "publish=$port" -q | xargs -r docker stop 2>/dev/null || true
+            fi
+          done
+          
+          echo "✅ All services stopped and ports freed"
       
       # -----------------------------------------------------------------------
       # Step 4: Clean up old images (optional)
@@ -135,9 +187,13 @@ jobs:
       - name: 🏥 Check Backend Health
         run: |
           echo "Checking Backend API health..."
+          
+          # Get backend port from .env (default to 4004)
+          BACKEND_PORT=$(grep "^BACKEND_PORT=" .env | cut -d'=' -f2 || echo "4004")
+          
           for i in {1..10}; do
-            if curl -f http://localhost:4004/api/health 2>/dev/null || curl -f http://localhost:4004 2>/dev/null; then
-              echo "✅ Backend is healthy!"
+            if curl -f http://localhost:${BACKEND_PORT}/api/health 2>/dev/null || curl -f http://localhost:${BACKEND_PORT} 2>/dev/null; then
+              echo "✅ Backend is healthy on port ${BACKEND_PORT}!"
               break
             fi
             echo "Attempt $i/10: Backend not ready, waiting 10s..."
@@ -154,9 +210,13 @@ jobs:
       - name: 🌐 Check Frontend Health
         run: |
           echo "Checking Frontend health..."
+          
+          # Get frontend port from .env (default to 3004)
+          FRONTEND_PORT=$(grep "^FRONTEND_PORT=" .env | cut -d'=' -f2 || echo "3004")
+          
           for i in {1..10}; do
-            if curl -f http://localhost:3004 2>/dev/null || curl -f http://localhost:3004 2>/dev/null; then
-              echo "✅ Frontend is healthy!"
+            if curl -f http://localhost:${FRONTEND_PORT} 2>/dev/null; then
+              echo "✅ Frontend is healthy on port ${FRONTEND_PORT}!"
               break
             fi
             echo "Attempt $i/10: Frontend not ready, waiting 10s..."
