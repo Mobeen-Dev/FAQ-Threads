@@ -1,0 +1,706 @@
+<script>
+  (function () {
+    // Configuration - update these values
+    const CONFIG = {
+      webhookUrl: "https://your-api.com/api/webhooks/YOUR_WEBHOOK_KEY/faq",
+      product: {
+        id: "", // Will be auto-detected from page
+        handle: "", // Will be auto-detected from page
+        title: "", // Will be auto-detected from page
+        price: "", // Will be auto-detected from page
+        image: "", // Will be auto-detected from page
+      },
+    };
+
+    // Auto-detect product info from Shopify page
+    function detectProductInfo() {
+      try {
+        // Try to get product from Shopify meta or global object
+        if (
+          typeof ShopifyAnalytics !== "undefined" &&
+          ShopifyAnalytics.meta &&
+          ShopifyAnalytics.meta.product
+        ) {
+          const product = ShopifyAnalytics.meta.product;
+          CONFIG.product.id = product.id;
+          CONFIG.product.handle =
+            product.variants && product.variants[0]
+              ? product.variants[0].name
+              : "";
+        }
+
+        // Try meta tags
+        const productId = document.querySelector('meta[property="product:id"]');
+        if (productId) CONFIG.product.id = productId.content;
+
+        // Get product title
+        const titleEl = document.querySelector(
+          '.product-title, .product__title, h1[itemprop="name"], h1.product-single__title',
+        );
+        if (titleEl) CONFIG.product.title = titleEl.textContent.trim();
+
+        // Get product price
+        const priceEl = document.querySelector(
+          '.product-price, .product__price, [itemprop="price"], .price-item--regular',
+        );
+        if (priceEl) CONFIG.product.price = priceEl.textContent.trim();
+
+        // Get product image
+        const imageEl = document.querySelector(
+          '.product-featured-image img, .product__main-photos img, [itemprop="image"]',
+        );
+        if (imageEl) CONFIG.product.image = imageEl.src || imageEl.dataset.src;
+
+        // Get product handle from URL
+        const pathParts = window.location.pathname.split("/");
+        const productIndex = pathParts.indexOf("products");
+        if (productIndex !== -1 && pathParts[productIndex + 1]) {
+          CONFIG.product.handle = pathParts[productIndex + 1];
+        }
+      } catch (error) {
+        console.warn("Could not auto-detect all product info:", error);
+      }
+    }
+
+    detectProductInfo();
+
+    // Create modal HTML
+    function createModal() {
+      const modal = document.createElement("div");
+      modal.className = "piq-modal-overlay";
+      modal.innerHTML = `
+      <div class="piq-modal">
+        <button type="button" class="piq-modal-close" aria-label="Close">&times;</button>
+        
+        <div class="piq-product-preview">
+          ${CONFIG.product.image ? `<img src="${CONFIG.product.image}" alt="${CONFIG.product.title || "Product"}" class="piq-product-image">` : ""}
+          <div class="piq-product-info">
+            <h3 class="piq-product-title">${CONFIG.product.title || "Product Inquiry"}</h3>
+            ${CONFIG.product.price ? `<p class="piq-product-price">${CONFIG.product.price}</p>` : ""}
+          </div>
+        </div>
+
+        <h2 class="piq-form-title">Ask a Question</h2>
+        
+        <form id="piq-inquiry-form" class="piq-form">
+          <div class="piq-form-group">
+            <label for="piq-name" class="piq-label">Name <span class="piq-required">*</span></label>
+            <input 
+              type="text" 
+              id="piq-name" 
+              name="name" 
+              class="piq-input" 
+              required 
+              placeholder="Your full name"
+            >
+          </div>
+
+          <div class="piq-form-group">
+            <label for="piq-email" class="piq-label">Email <span class="piq-required">*</span></label>
+            <input 
+              type="email" 
+              id="piq-email" 
+              name="email" 
+              class="piq-input" 
+              required 
+              placeholder="your.email@example.com"
+            >
+          </div>
+
+          <div class="piq-form-group">
+            <label for="piq-phone" class="piq-label">Phone Number <span class="piq-required">*</span></label>
+            <input 
+              type="tel" 
+              id="piq-phone" 
+              name="phone" 
+              class="piq-input" 
+              required 
+              placeholder="+92 300 1234567"
+            >
+          </div>
+
+          <div class="piq-form-group">
+            <label for="piq-message" class="piq-label">Message <span class="piq-required">*</span></label>
+            <textarea 
+              id="piq-message" 
+              name="message" 
+              class="piq-textarea" 
+              required 
+              rows="4"
+              maxlength="1500"
+              placeholder="Please describe your question about this product..."
+            ></textarea>
+            <span class="piq-char-count"><span id="piq-char-counter">0</span>/1500</span>
+          </div>
+
+          <div class="piq-form-message" id="piq-form-message"></div>
+
+          <button type="submit" class="piq-submit-btn" id="piq-submit-btn">
+            Send
+          </button>
+        </form>
+      </div>
+    `;
+      document.body.appendChild(modal);
+      return modal;
+    }
+
+    // Show modal
+    function showModal() {
+      let modal = document.querySelector(".piq-modal-overlay");
+      if (!modal) {
+        modal = createModal();
+        attachModalHandlers(modal);
+      }
+      modal.classList.add("piq-active");
+      document.body.style.overflow = "hidden";
+    }
+
+    // Hide modal
+    function hideModal() {
+      const modal = document.querySelector(".piq-modal-overlay");
+      if (modal) {
+        modal.classList.remove("piq-active");
+        document.body.style.overflow = "";
+
+        // Reset form after animation
+        setTimeout(() => {
+          const form = modal.querySelector("#piq-inquiry-form");
+          if (form) form.reset();
+          const message = modal.querySelector("#piq-form-message");
+          if (message) {
+            message.textContent = "";
+            message.className = "piq-form-message";
+          }
+        }, 300);
+      }
+    }
+
+    // Show message
+    function showMessage(text, type = "info") {
+      const messageEl = document.getElementById("piq-form-message");
+      if (messageEl) {
+        messageEl.textContent = text;
+        messageEl.className = `piq-form-message piq-message-${type}`;
+      }
+    }
+
+    // Validate email
+    function isValidEmail(email) {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
+    }
+
+    // Validate phone
+    function isValidPhone(phone) {
+      // Remove spaces, dashes, and parentheses
+      const cleaned = phone.replace(/[\s\-\(\)]/g, "");
+      // Check if it contains at least 10 digits
+      return /^\+?[\d]{10,15}$/.test(cleaned);
+    }
+
+    // Submit form
+    async function submitInquiry(formData) {
+      const submitBtn = document.getElementById("piq-submit-btn");
+      const originalText = submitBtn.textContent;
+
+      try {
+        // Validate
+        if (!formData.name || formData.name.trim().length < 2) {
+          showMessage("Please enter a valid name", "error");
+          return;
+        }
+
+        if (!isValidEmail(formData.email)) {
+          showMessage("Please enter a valid email address", "error");
+          return;
+        }
+
+        if (!isValidPhone(formData.phone)) {
+          showMessage("Please enter a valid phone number", "error");
+          return;
+        }
+
+        if (!formData.message || formData.message.trim().length < 10) {
+          showMessage(
+            "Please enter a message with at least 10 characters",
+            "error",
+          );
+          return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="piq-spinner"></span> Sending...';
+        showMessage("Submitting your inquiry...", "info");
+
+        // Prepare payload
+        const payload = {
+          question: formData.message,
+          customer: {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+          },
+          productId: CONFIG.product.id || undefined,
+          productHandle: CONFIG.product.handle || undefined,
+          productTitle: CONFIG.product.title || undefined,
+          productUrl: window.location.href,
+        };
+
+        // Send to API
+        const response = await fetch(CONFIG.webhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (e) {
+          // Response might not be JSON
+        }
+
+        if (!response.ok) {
+          const errorMsg =
+            data.error || `Request failed with status ${response.status}`;
+          throw new Error(errorMsg);
+        }
+
+        // Success
+        showMessage(
+          "✓ Your question has been submitted successfully! We will get back to you soon.",
+          "success",
+        );
+
+        // Reset form after 2 seconds and close modal
+        setTimeout(() => {
+          hideModal();
+        }, 2500);
+      } catch (error) {
+        console.error("Inquiry submission error:", error);
+        showMessage(
+          `Error: ${error.message}. Please try again or contact support.`,
+          "error",
+        );
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
+
+    // Attach modal event handlers
+    function attachModalHandlers(modal) {
+      // Close button
+      const closeBtn = modal.querySelector(".piq-modal-close");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", hideModal);
+      }
+
+      // Click outside to close
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          hideModal();
+        }
+      });
+
+      // Escape key to close
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.classList.contains("piq-active")) {
+          hideModal();
+        }
+      });
+
+      // Character counter
+      const textarea = modal.querySelector("#piq-message");
+      const counter = modal.querySelector("#piq-char-counter");
+      if (textarea && counter) {
+        textarea.addEventListener("input", () => {
+          counter.textContent = textarea.value.length;
+        });
+      }
+
+      // Form submission
+      const form = modal.querySelector("#piq-inquiry-form");
+      if (form) {
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+
+          const formData = {
+            name: form.querySelector('[name="name"]').value,
+            email: form.querySelector('[name="email"]').value,
+            phone: form.querySelector('[name="phone"]').value,
+            message: form.querySelector('[name="message"]').value,
+          };
+
+          submitInquiry(formData);
+        });
+      }
+    }
+
+    // Attach to trigger button
+    document.addEventListener("click", (e) => {
+      if (e.target.closest(".ask-question-trigger")) {
+        e.preventDefault();
+        showModal();
+      }
+    });
+  })();
+</script>
+
+<style>
+  /* Trigger Button Styles */
+  .ask-question-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+    background: #f5f7fa;
+    border: 1px solid #e1e5eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: inherit;
+  }
+
+  .ask-question-trigger:hover {
+    background: #eef2f7;
+    border-color: #cfd6e0;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .ask-question-trigger::before {
+    content: "💬";
+    font-size: 16px;
+  }
+
+  @keyframes softPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(34, 139, 34, 0.2);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(34, 139, 34, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(34, 139, 34, 0);
+    }
+  }
+
+  .ask-question-trigger {
+    animation: softPulse 3s infinite;
+  }
+
+  /* Modal Overlay */
+  .piq-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.3s ease,
+      visibility 0.3s ease;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .piq-modal-overlay.piq-active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* Modal Container */
+  .piq-modal {
+    background: #ffffff;
+    border-radius: 12px;
+    max-width: 540px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .piq-modal-overlay.piq-active .piq-modal {
+    transform: scale(1);
+  }
+
+  /* Close Button */
+  .piq-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    padding: 0;
+  }
+
+  .piq-modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+  }
+
+  /* Product Preview Section */
+  .piq-product-preview {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 16px;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 24px;
+  }
+
+  .piq-product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+
+  .piq-product-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .piq-product-title {
+    margin: 0 0 8px 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #111827;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .piq-product-price {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #228b22;
+  }
+
+  /* Form Title */
+  .piq-form-title {
+    margin: 0 0 20px 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    text-align: left;
+  }
+
+  /* Form Styles */
+  .piq-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .piq-form-group {
+    position: relative;
+  }
+
+  .piq-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .piq-required {
+    color: #dc2626;
+  }
+
+  .piq-input,
+  .piq-textarea {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #111827;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .piq-input:focus,
+  .piq-textarea:focus {
+    outline: none;
+    border-color: #228b22;
+    box-shadow: 0 0 0 3px rgba(34, 139, 34, 0.1);
+  }
+
+  .piq-textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .piq-char-count {
+    display: block;
+    text-align: right;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  /* Form Message */
+  .piq-form-message {
+    padding: 12px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.5;
+    display: none;
+  }
+
+  .piq-form-message:not(:empty) {
+    display: block;
+  }
+
+  .piq-message-info {
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    color: #1e40af;
+  }
+
+  .piq-message-success {
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    color: #065f46;
+  }
+
+  .piq-message-error {
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+  }
+
+  /* Submit Button */
+  .piq-submit-btn {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    background: #228b22;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .piq-submit-btn:hover:not(:disabled) {
+    background: #1e7a1e;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 139, 34, 0.3);
+  }
+
+  .piq-submit-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  /* Loading Spinner */
+  .piq-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: piq-spin 0.6s linear infinite;
+  }
+
+  @keyframes piq-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 640px) {
+    .piq-modal {
+      padding: 20px;
+      margin: 10px;
+      max-height: 95vh;
+    }
+
+    .piq-product-preview {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .piq-product-image {
+      width: 100%;
+      height: auto;
+      max-width: 200px;
+    }
+
+    .piq-form-title {
+      font-size: 20px;
+    }
+
+    .piq-submit-btn {
+      padding: 12px 20px;
+      font-size: 15px;
+    }
+  }
+
+  /* Accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    .piq-modal-overlay,
+    .piq-modal,
+    .ask-question-trigger,
+    .piq-submit-btn,
+    .piq-modal-close,
+    .piq-input,
+    .piq-textarea {
+      transition: none;
+      animation: none;
+    }
+  }
+</style>
+
+<!-- Trigger Button -->
+<button class="ask-question-trigger">Ask a Question</button>

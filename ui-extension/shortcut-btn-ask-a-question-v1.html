@@ -1,0 +1,99 @@
+<!-- This btn Focus-on "Ask a Question" Tab in Product page 
+       and move page focus to there via animating  -->
+
+<script>
+(function () {
+  const TARGET_TEXT = "Ask a Question";
+
+  function findAskQuestionButton() {
+    const buttons = document.querySelectorAll('hdt-tab button');
+    return Array.from(buttons).find(btn =>
+      btn.textContent.trim().toLowerCase() === TARGET_TEXT.toLowerCase()
+    );
+  }
+
+  function scrollToPosition(element) {
+    const rect = element.getBoundingClientRect();
+    const absoluteTop = rect.top + window.pageYOffset;
+
+    // Place tab row slightly above middle (40% viewport)
+    const offset = window.innerHeight * 0.4;
+
+    window.scrollTo({
+      top: absoluteTop - offset,
+      behavior: 'smooth'
+    });
+  }
+
+  function activateAskQuestionTab() {
+    const button = findAskQuestionButton();
+    if (!button) return;
+
+    const tabContainer = button.closest('hdt-tab');
+
+    // Click the tab (uses Shopify theme logic)
+    button.click();
+
+    // Scroll after small delay
+    setTimeout(function () {
+      if (tabContainer) {
+        scrollToPosition(tabContainer);
+      }
+    }, 200);
+  }
+
+  // Attach to your custom trigger button
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.ask-question-trigger')) {
+      e.preventDefault();
+      activateAskQuestionTab();
+    }
+  });
+
+})();
+</script>
+
+<style>
+.ask-question-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  background: #f5f7fa;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+/* subtle hover effect */
+.ask-question-trigger:hover {
+  background: #eef2f7;
+  border-color: #cfd6e0;
+  transform: translateY(-1px);
+}
+
+/* small icon for visual cue */
+.ask-question-trigger::before {
+  content: "💬";
+  font-size: 14px;
+}
+
+/* gentle pulse (very subtle, not annoying) */
+@keyframes softPulse {
+  0% { box-shadow: 0 0 0 0 rgba(0,0,0,0.05); }
+  70% { box-shadow: 0 0 0 6px rgba(0,0,0,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+
+.ask-question-trigger {
+  animation: softPulse 3s infinite;
+}
+</style>
+
+<button class="ask-question-trigger">
+  Ask a Question
+</button>
