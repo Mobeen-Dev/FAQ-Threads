@@ -9,8 +9,8 @@ router.use(authMiddleware);
 router.get("/", async (req, res, next) => {
   try {
     if (!req.shopId) return res.json({ answers: [] });
-    const { questionId, status, search } = req.query;
-    const answers = await faqService.getAnswers(req.shopId, questionId, { status, search });
+    const { questionId, status, search, sortBy, fromDate, toDate } = req.query;
+    const answers = await faqService.getAnswers(req.shopId, questionId, { status, search, sortBy, fromDate, toDate });
     res.json({ answers });
   } catch (error) {
     next(error);

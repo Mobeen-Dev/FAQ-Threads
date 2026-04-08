@@ -32,13 +32,16 @@ router.post("/categories", async (req, res, next) => {
 router.get("/", async (req, res, next) => {
   try {
     if (!req.shopId) return res.json({ questions: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
-    const { categoryId, status, search, page = 1, limit = 20 } = req.query;
+    const { categoryId, status, search, page = 1, limit = 20, sortBy, fromDate, toDate } = req.query;
     const result = await faqService.getQuestions(req.shopId, {
       categoryId,
       status,
       search,
       page: Number(page),
       limit: Number(limit),
+      sortBy,
+      fromDate,
+      toDate,
     });
     res.json(result);
   } catch (error) {
@@ -50,7 +53,8 @@ router.get("/", async (req, res, next) => {
 router.get("/analytics", async (req, res, next) => {
   try {
     if (!req.shopId) return res.json({ totalQuestions: 0, published: 0, pending: 0, categories: 0 });
-    const analytics = await faqService.getAnalytics(req.shopId);
+    const { fromDate, toDate } = req.query;
+    const analytics = await faqService.getAnalytics(req.shopId, { fromDate, toDate });
     res.json(analytics);
   } catch (error) {
     next(error);

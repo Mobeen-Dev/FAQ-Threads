@@ -375,8 +375,9 @@ export const shopifyApi = {
   },
 
   // Analytics
-  getAnalytics() {
-    return request<AnalyticsData>("/questions/analytics");
+  getAnalytics(params?: Record<string, string>) {
+    const query = params ? "?" + new URLSearchParams(params).toString() : "";
+    return request<AnalyticsData>(`/questions/analytics${query}`);
   },
 
   // Contributors

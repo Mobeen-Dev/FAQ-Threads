@@ -6,6 +6,8 @@ import QuestionForm from "@/components/QuestionForm";
 import QuestionTable from "@/components/QuestionTable";
 import AssociatedProductCard from "@/components/AssociatedProductCard";
 import MaterialIcon from "@/components/MaterialIcon";
+import DateFilter, { type DateFilterValue, type DateRange } from "@/components/DateFilter";
+import SortDropdown, { type SortOption } from "@/components/SortDropdown";
 import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type PaginatedResponse, type Question, type Category } from "@/services/shopifyApi";
@@ -18,6 +20,9 @@ export default function QuestionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [saving, setSaving] = useState(false);
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [openQuestion, setOpenQuestion] = useState<Question | null>(null);
@@ -39,14 +44,18 @@ export default function QuestionsPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [openQuestionId]);
 
+  // Build API params including date range and sorting (server-side filtering)
   const { data: questionsData, loading, refetch } = useFetch<PaginatedResponse<Question>>(
     () => {
       const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
+      if (sortBy) params.sortBy = sortBy;
+      if (dateRange?.startDate) params.fromDate = dateRange.startDate.toISOString();
+      if (dateRange?.endDate) params.toDate = dateRange.endDate.toISOString();
       return shopifyApi.getQuestions(params);
     },
-    [user?.id, statusFilter, searchQuery]
+    [user?.id, statusFilter, searchQuery, sortBy, dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime()]
   );
 
   const { data: categoriesData, refetch: refetchCategories } = useFetch<{ categories: Category[] }>(
@@ -54,6 +63,7 @@ export default function QuestionsPage() {
     [user?.id]
   );
 
+  // Data comes pre-filtered and sorted from the server
   const questions = questionsData?.questions ?? [];
   const categories = categoriesData?.categories ?? [];
 
@@ -164,13 +174,13 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-6 flex-wrap">
         <input
           type="text"
           placeholder="Search questions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 flex-1 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+          className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 flex-1 min-w-[200px] bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
         />
         <select
           value={statusFilter}
@@ -184,6 +194,15 @@ export default function QuestionsPage() {
           <option value="draft">Draft</option>
           <option value="suspended">Suspended</option>
         </select>
+        <DateFilter
+          value={dateFilter}
+          dateRange={dateRange}
+          onChange={(value, range) => {
+            setDateFilter(value);
+            setDateRange(range);
+          }}
+        />
+        <SortDropdown value={sortBy} onChange={setSortBy} />
       </div>
 
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800">

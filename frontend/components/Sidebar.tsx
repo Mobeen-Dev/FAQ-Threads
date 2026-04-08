@@ -23,7 +23,7 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <aside className="w-64 bg-white dark:bg-zinc-950 text-stone-900 dark:text-zinc-100 min-h-screen p-4 flex flex-col border-r border-stone-200 dark:border-zinc-800">
+    <aside className="w-64 bg-white dark:bg-zinc-950 text-stone-900 dark:text-zinc-100 h-screen sticky top-0 p-4 flex flex-col border-r border-stone-200 dark:border-zinc-800 overflow-y-auto">
       <div className="mb-8">
         <h1 className="text-xl font-bold tracking-tight">
           <span className="text-teal-600 dark:text-teal-400">FAQ</span> Manager
@@ -31,7 +31,7 @@ export default function Sidebar() {
         <p className="text-stone-500 dark:text-zinc-400 text-sm mt-1 truncate">{user?.email}</p>
       </div>
 
-      <nav className="space-y-1 flex-1">
+      <nav className="space-y-1 flex-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -51,7 +51,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="space-y-2 pt-4 border-t border-stone-200 dark:border-zinc-800">
+      <div className="space-y-2 pt-4 border-t border-stone-200 dark:border-zinc-800 mt-4">
         <button
           onClick={toggleTheme}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-100 transition-colors w-full"

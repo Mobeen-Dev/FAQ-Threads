@@ -7,6 +7,9 @@ import { useFetch } from "@/hooks/useFetch";
 import { shopifyApi, type Answer } from "@/services/shopifyApi";
 import AssociatedProductCard from "@/components/AssociatedProductCard";
 import MaterialIcon from "@/components/MaterialIcon";
+import DateFilter, { type DateFilterValue, type DateRange } from "@/components/DateFilter";
+import SortDropdown, { type SortOption } from "@/components/SortDropdown";
+import { formatRelativeDate } from "@/utils/date";
 
 const statusClasses: Record<string, string> = {
   published: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
@@ -21,21 +24,29 @@ export default function AnswersPage() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [questionIdFilter, setQuestionIdFilter] = useState(searchParams.get("questionId") || "");
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [editing, setEditing] = useState<Answer | null>(null);
   const [answerText, setAnswerText] = useState("");
   const [saving, setSaving] = useState(false);
   const modalCloseButtonRef = useRef<HTMLButtonElement | null>(null);
 
+  // Build API params including date range and sorting (server-side filtering)
   const { data, loading, refetch } = useFetch<{ answers: Answer[] }>(
     () => {
       const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
       if (search) params.search = search;
+      if (sortBy) params.sortBy = sortBy;
+      if (dateRange?.startDate) params.fromDate = dateRange.startDate.toISOString();
+      if (dateRange?.endDate) params.toDate = dateRange.endDate.toISOString();
       return shopifyApi.getAnswers(questionIdFilter || undefined, params);
     },
-    [user?.id, statusFilter, questionIdFilter, search]
+    [user?.id, statusFilter, questionIdFilter, search, sortBy, dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime()]
   );
 
+  // Data comes pre-filtered and sorted from the server
   const answers = data?.answers ?? [];
 
   const title = useMemo(() => {
@@ -105,7 +116,7 @@ export default function AnswersPage() {
       </div>
 
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -115,7 +126,7 @@ export default function AnswersPage() {
           <input
             value={questionIdFilter}
             onChange={(e) => setQuestionIdFilter(e.target.value)}
-            placeholder="Filter by question ID (optional)"
+            placeholder="Filter by question ID"
             className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
           />
           <select
@@ -129,6 +140,15 @@ export default function AnswersPage() {
             <option value="rejected">Rejected</option>
             <option value="suspended">Suspended</option>
           </select>
+          <DateFilter
+            value={dateFilter}
+            dateRange={dateRange}
+            onChange={(value, range) => {
+              setDateFilter(value);
+              setDateRange(range);
+            }}
+          />
+          <SortDropdown value={sortBy} onChange={setSortBy} />
         </div>
       </div>
 
@@ -171,6 +191,11 @@ export default function AnswersPage() {
                       <span className="px-2 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300">
                         Score: {answer.voteScore}
                       </span>
+                      {answer.createdAt && (
+                        <span className="text-stone-500 dark:text-zinc-400">
+                          {formatRelativeDate(answer.createdAt)}
+                        </span>
+                      )}
                       {answer.contributor && (
                         <span className="text-stone-500 dark:text-zinc-400">
                           by {answer.contributor.name || answer.contributor.email}

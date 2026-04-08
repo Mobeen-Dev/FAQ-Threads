@@ -73,7 +73,7 @@ async function createCategory(shopId, data) {
 // ---------- Questions ----------
 
 async function getQuestions(shopId, filters = {}) {
-  const { categoryId, status, search, page = 1, limit = 20, sort = "sortOrder" } = filters;
+  const { categoryId, status, search, page = 1, limit = 20, sortBy = "newest", fromDate, toDate } = filters;
   await settingsService.applyTimeBasedPublishing(shopId);
 
   const where = { shopId };
@@ -86,7 +86,28 @@ async function getQuestions(shopId, filters = {}) {
     ];
   }
 
-  const orderBy = sort === "votes" ? { voteScore: "desc" } : { sortOrder: "asc" };
+  // Date range filtering
+  if (fromDate || toDate) {
+    where.createdAt = {};
+    if (fromDate) where.createdAt.gte = new Date(fromDate);
+    if (toDate) where.createdAt.lte = new Date(toDate);
+  }
+
+  // Sorting: newest, oldest, popular, or default (sortOrder)
+  let orderBy;
+  switch (sortBy) {
+    case "oldest":
+      orderBy = { createdAt: "asc" };
+      break;
+    case "popular":
+      orderBy = { voteScore: "desc" };
+      break;
+    case "newest":
+      orderBy = { createdAt: "desc" };
+      break;
+    default:
+      orderBy = { sortOrder: "asc" };
+  }
 
   const [questions, total] = await Promise.all([
     prisma.question.findMany({
@@ -211,13 +232,35 @@ async function deleteQuestion(shopId, id) {
 // ---------- Answers ----------
 
 async function getAnswers(shopId, questionId, filters = {}) {
+  const { status, search, sortBy = "newest", fromDate, toDate } = filters;
   await settingsService.applyTimeBasedPublishing(shopId);
 
   const where = { shopId };
   if (questionId) where.questionId = questionId;
-  if (filters.status) where.status = filters.status;
-  if (filters.search) {
-    where.answerText = { contains: filters.search, mode: "insensitive" };
+  if (status) where.status = status;
+  if (search) {
+    where.answerText = { contains: search, mode: "insensitive" };
+  }
+
+  // Date range filtering
+  if (fromDate || toDate) {
+    where.createdAt = {};
+    if (fromDate) where.createdAt.gte = new Date(fromDate);
+    if (toDate) where.createdAt.lte = new Date(toDate);
+  }
+
+  // Sorting
+  let orderBy;
+  switch (sortBy) {
+    case "oldest":
+      orderBy = [{ createdAt: "asc" }];
+      break;
+    case "popular":
+      orderBy = [{ voteScore: "desc" }, { createdAt: "desc" }];
+      break;
+    case "newest":
+    default:
+      orderBy = [{ createdAt: "desc" }];
   }
 
   return prisma.answer.findMany({
@@ -243,7 +286,7 @@ async function getAnswers(shopId, questionId, filters = {}) {
       },
       _count: { select: { votes: true } },
     },
-    orderBy: [{ createdAt: "desc" }, { voteScore: "desc" }],
+    orderBy,
   });
 }
 
@@ -325,21 +368,31 @@ async function moderateAnswer(shopId, answerId, action) {
 
 // ---------- Analytics ----------
 
-async function getAnalytics(shopId) {
+async function getAnalytics(shopId, filters = {}) {
+  const { fromDate, toDate } = filters;
   await settingsService.applyTimeBasedPublishing(shopId);
+
+  // Build date filter for queries
+  const dateFilter = {};
+  if (fromDate || toDate) {
+    dateFilter.createdAt = {};
+    if (fromDate) dateFilter.createdAt.gte = new Date(fromDate);
+    if (toDate) dateFilter.createdAt.lte = new Date(toDate);
+  }
+
   const [
     totalQuestions, published, pending, suspended, categories,
     totalAnswers, publishedAnswers, totalContributors, trustedContributors,
   ] = await Promise.all([
-    prisma.question.count({ where: { shopId } }),
-    prisma.question.count({ where: { shopId, status: "published" } }),
-    prisma.question.count({ where: { shopId, status: "pending" } }),
-    prisma.question.count({ where: { shopId, status: "suspended" } }),
-    prisma.category.count({ where: { shopId } }),
-    prisma.answer.count({ where: { shopId } }),
-    prisma.answer.count({ where: { shopId, status: "published" } }),
-    prisma.storeContributor.count({ where: { shopId } }),
-    prisma.storeContributor.count({ where: { shopId, trusted: true } }),
+    prisma.question.count({ where: { shopId, ...dateFilter } }),
+    prisma.question.count({ where: { shopId, status: "published", ...dateFilter } }),
+    prisma.question.count({ where: { shopId, status: "pending", ...dateFilter } }),
+    prisma.question.count({ where: { shopId, status: "suspended", ...dateFilter } }),
+    prisma.category.count({ where: { shopId } }), // Categories don't get date-filtered
+    prisma.answer.count({ where: { shopId, ...dateFilter } }),
+    prisma.answer.count({ where: { shopId, status: "published", ...dateFilter } }),
+    prisma.storeContributor.count({ where: { shopId, ...dateFilter } }),
+    prisma.storeContributor.count({ where: { shopId, trusted: true, ...dateFilter } }),
   ]);
 
   return {

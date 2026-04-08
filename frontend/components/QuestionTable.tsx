@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import MaterialIcon from "@/components/MaterialIcon";
 import { type Question } from "@/services/shopifyApi";
+import { formatRelativeDate } from "@/utils/date";
 
 interface QuestionTableProps {
   questions: Question[];
@@ -162,6 +163,11 @@ export default function QuestionTable({ questions, onOpen, onEdit, onDelete, onS
                       <MaterialIcon name="chat" className="text-sm" />
                       {answerCount} {answerCount === 1 ? "answer" : "answers"}
                     </button>
+                  )}
+                  {q.createdAt && (
+                    <span className="text-xs text-stone-400 dark:text-zinc-500">
+                      {formatRelativeDate(q.createdAt)}
+                    </span>
                   )}
                   {q.contributor && (
                     <span className="text-xs text-stone-400 dark:text-zinc-500">

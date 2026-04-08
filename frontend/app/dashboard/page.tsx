@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import StatCard from "@/components/StatCard";
+import DateFilter, { type DateFilterValue, type DateRange } from "@/components/DateFilter";
 import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type AnalyticsData } from "@/services/shopifyApi";
@@ -8,11 +10,24 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
+  // Build API params for server-side filtered analytics
   const { data, loading, error } = useFetch<AnalyticsData>(
-    () => shopifyApi.getAnalytics(),
-    [user?.id]
+    () => {
+      const params: Record<string, string> = {};
+      if (dateRange?.startDate) params.fromDate = dateRange.startDate.toISOString();
+      if (dateRange?.endDate) params.toDate = dateRange.endDate.toISOString();
+      return shopifyApi.getAnalytics(params);
+    },
+    [user?.id, dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime()]
   );
+
+  const handleDateFilterChange = (value: DateFilterValue, range?: DateRange) => {
+    setDateFilter(value);
+    setDateRange(range);
+  };
 
   if (!user) return null;
 
@@ -26,7 +41,14 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-stone-900 dark:text-zinc-100 mb-6">Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-stone-900 dark:text-zinc-100">Dashboard</h1>
+        <DateFilter
+          value={dateFilter}
+          dateRange={dateRange}
+          onChange={handleDateFilterChange}
+        />
+      </div>
 
       {/* Primary stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
