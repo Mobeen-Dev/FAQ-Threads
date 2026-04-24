@@ -75,6 +75,8 @@ async function createCategory(shopId, data) {
 async function getQuestions(shopId, filters = {}) {
   const { categoryId, status, search, page = 1, limit = 20, sortBy = "newest", fromDate, toDate } = filters;
   await settingsService.applyTimeBasedPublishing(shopId);
+  const safePage = Number.isFinite(page) && Number(page) > 0 ? Number(page) : 1;
+  const safeLimit = Number.isFinite(limit) && Number(limit) > 0 ? Math.min(Number(limit), 100) : 20;
 
   const where = { shopId };
   if (categoryId) where.categoryId = categoryId;
@@ -123,19 +125,28 @@ async function getQuestions(shopId, filters = {}) {
           },
         },
         category: true,
-        contributor: { select: { id: true, name: true, email: true, trusted: true } },
+        contributor: { select: { id: true, name: true, email: true, phone: true, trusted: true } },
         _count: { select: { answers: true, votes: true } },
       },
       orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     }),
     prisma.question.count({ where }),
   ]);
 
+  const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+
   return {
     questions,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages,
+      hasNextPage: safePage < totalPages,
+      hasPreviousPage: safePage > 1,
+    },
   };
 }
 
@@ -154,7 +165,7 @@ async function getQuestion(shopId, id) {
         },
       },
       category: true,
-      contributor: { select: { id: true, name: true, email: true, trusted: true } },
+      contributor: { select: { id: true, name: true, email: true, phone: true, trusted: true } },
       answers: {
         include: {
           contributor: { select: { id: true, name: true, email: true, trusted: true } },

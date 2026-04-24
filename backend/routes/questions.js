@@ -3,6 +3,15 @@ const router = express.Router();
 const faqService = require("../services/faqService");
 const authMiddleware = require("../middleware/auth");
 
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+function parsePositiveInt(value, fallback, { max } = {}) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return typeof max === "number" ? Math.min(parsed, max) : parsed;
+}
+
 router.use(authMiddleware);
 
 // List all FAQ categories for a user's shop
@@ -31,14 +40,30 @@ router.post("/categories", async (req, res, next) => {
 // List questions (with optional filters)
 router.get("/", async (req, res, next) => {
   try {
-    if (!req.shopId) return res.json({ questions: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
-    const { categoryId, status, search, page = 1, limit = 20, sortBy, fromDate, toDate } = req.query;
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, DEFAULT_PAGE_SIZE, { max: MAX_PAGE_SIZE });
+
+    if (!req.shopId) {
+      return res.json({
+        questions: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: page > 1,
+        },
+      });
+    }
+
+    const { categoryId, status, search, sortBy, fromDate, toDate } = req.query;
     const result = await faqService.getQuestions(req.shopId, {
       categoryId,
       status,
       search,
-      page: Number(page),
-      limit: Number(limit),
+      page,
+      limit,
       sortBy,
       fromDate,
       toDate,
