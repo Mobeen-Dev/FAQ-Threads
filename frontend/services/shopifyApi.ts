@@ -135,7 +135,12 @@ export interface Question {
   } | null;
   categoryId: string | null;
   category?: Category;
-  contributor?: { id: string; name: string | null; email: string; trusted: boolean } | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  contributor?: { id: string; name: string | null; email: string; phone?: string | null; trusted: boolean } | null;
   _count?: { answers: number; votes: number };
   answers?: Answer[];
   publishedAt: string | null;
@@ -218,6 +223,8 @@ export interface PaginatedResponse<T> {
     limit: number;
     total: number;
     totalPages: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
   };
 }
 

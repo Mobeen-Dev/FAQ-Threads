@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import QuestionForm from "@/components/QuestionForm";
 import QuestionTable from "@/components/QuestionTable";
 import AssociatedProductCard from "@/components/AssociatedProductCard";
@@ -12,17 +12,32 @@ import { useFetch } from "@/hooks/useFetch";
 import { useAuth } from "@/hooks/useAuth";
 import { shopifyApi, type PaginatedResponse, type Question, type Category } from "@/services/shopifyApi";
 
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export default function QuestionsPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchParams.get("search") || "");
   const [dateFilter, setDateFilter] = useState<DateFilterValue>("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [page, setPage] = useState(() => parsePositiveInt(searchParams.get("page"), 1));
+  const [pageSize, setPageSize] = useState(() => {
+    const requested = parsePositiveInt(searchParams.get("limit"), DEFAULT_PAGE_SIZE);
+    return PAGE_SIZE_OPTIONS.includes(requested as (typeof PAGE_SIZE_OPTIONS)[number]) ? requested : DEFAULT_PAGE_SIZE;
+  });
   const [saving, setSaving] = useState(false);
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [openQuestion, setOpenQuestion] = useState<Question | null>(null);
@@ -44,18 +59,25 @@ export default function QuestionsPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [openQuestionId]);
 
-  // Build API params including date range and sorting (server-side filtering)
-  const { data: questionsData, loading, refetch } = useFetch<PaginatedResponse<Question>>(
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearchQuery(searchQuery.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  // Build API params including date range, sorting, and pagination (server-side filtering)
+  const { data: questionsData, loading, error, refetch } = useFetch<PaginatedResponse<Question>>(
     () => {
       const params: Record<string, string> = {};
       if (statusFilter) params.status = statusFilter;
-      if (searchQuery) params.search = searchQuery;
+      if (debouncedSearchQuery) params.search = debouncedSearchQuery;
       if (sortBy) params.sortBy = sortBy;
+      params.page = String(page);
+      params.limit = String(pageSize);
       if (dateRange?.startDate) params.fromDate = dateRange.startDate.toISOString();
       if (dateRange?.endDate) params.toDate = dateRange.endDate.toISOString();
       return shopifyApi.getQuestions(params);
     },
-    [user?.id, statusFilter, searchQuery, sortBy, dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime()]
+    [user?.id, statusFilter, debouncedSearchQuery, sortBy, page, pageSize, dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime()]
   );
 
   const { data: categoriesData, refetch: refetchCategories } = useFetch<{ categories: Category[] }>(
@@ -63,9 +85,62 @@ export default function QuestionsPage() {
     [user?.id]
   );
 
-  // Data comes pre-filtered and sorted from the server
-  const questions = questionsData?.questions ?? [];
+  // Data comes pre-filtered and sorted from the server.
+  // Ensure customer contact fields exist for the question list UI.
+  const questions = useMemo(
+    () =>
+      (questionsData?.questions ?? []).map((question) => ({
+        ...question,
+        customerName: question.customerName ?? question.contributor?.name ?? question.contributor?.email ?? "Unknown customer",
+        email: question.email ?? question.customerEmail ?? question.contributor?.email ?? null,
+        phoneNumber: question.phoneNumber ?? question.customerPhone ?? question.contributor?.phone ?? null,
+      })),
+    [questionsData?.questions]
+  );
   const categories = categoriesData?.categories ?? [];
+  const pagination = questionsData?.pagination;
+  const totalQuestions = pagination?.total ?? 0;
+  const currentPage = pagination?.page ?? page;
+  const totalPages = pagination?.totalPages ?? 1;
+  const hasPreviousPage = pagination?.hasPreviousPage ?? currentPage > 1;
+  const hasNextPage = pagination?.hasNextPage ?? currentPage < totalPages;
+  const startItem = totalQuestions === 0 ? 0 : (currentPage - 1) * (pagination?.limit ?? pageSize) + 1;
+  const endItem = totalQuestions === 0 ? 0 : Math.min(currentPage * (pagination?.limit ?? pageSize), totalQuestions);
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    const adjustedStart = Math.max(1, end - 4);
+    return Array.from({ length: end - adjustedStart + 1 }, (_, index) => adjustedStart + index);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    if (searchQuery) params.set("search", searchQuery);
+    if (sortBy !== "newest") params.set("sortBy", sortBy);
+    if (page > 1) params.set("page", String(page));
+    if (pageSize !== DEFAULT_PAGE_SIZE) params.set("limit", String(pageSize));
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    if (nextQuery !== currentQuery) {
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    }
+  }, [pathname, page, pageSize, router, searchParams, searchQuery, sortBy, statusFilter]);
+
+  useEffect(() => {
+    if (!pagination) return;
+    const normalizedTotalPages = Math.max(1, pagination.totalPages);
+    if (page > normalizedTotalPages) {
+      setPage(normalizedTotalPages);
+    }
+  }, [page, pagination]);
+
+  const goToPage = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    setPage(nextPage);
+  };
 
   const handleCreate = async (data: { question: string; answer: string; categoryId?: string }) => {
     setSaving(true);
@@ -179,12 +254,18 @@ export default function QuestionsPage() {
           type="text"
           placeholder="Search questions..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setPage(1);
+          }}
           className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 flex-1 min-w-[200px] bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
           className="border border-stone-300 dark:border-zinc-600 rounded-xl px-3 py-2.5 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
         >
           <option value="">All statuses</option>
@@ -200,15 +281,34 @@ export default function QuestionsPage() {
           onChange={(value, range) => {
             setDateFilter(value);
             setDateRange(range);
+            setPage(1);
           }}
         />
-        <SortDropdown value={sortBy} onChange={setSortBy} />
+        <SortDropdown
+          value={sortBy}
+          onChange={(value) => {
+            setSortBy(value);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-stone-200 dark:border-zinc-800">
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-16 text-stone-500 dark:text-zinc-400" role="alert">
+            <MaterialIcon name="error" className="text-4xl mb-3 block text-rose-500" />
+            <p className="text-lg font-medium text-stone-700 dark:text-zinc-200">Failed to load questions</p>
+            <p className="text-sm mt-1 mb-4">{error}</p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 rounded-xl border border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <QuestionTable
@@ -222,10 +322,68 @@ export default function QuestionsPage() {
         )}
       </div>
 
-      {questionsData?.pagination && (
-        <div className="mt-4 text-sm text-stone-500 dark:text-zinc-400 text-center">
-          Showing {questions.length} of {questionsData.pagination.total} questions
-          (Page {questionsData.pagination.page} of {questionsData.pagination.totalPages})
+      {pagination && (
+        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-sm text-stone-500 dark:text-zinc-400">
+            Showing {startItem}-{endItem} of {totalQuestions} questions
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="questions-page-size" className="text-sm text-stone-500 dark:text-zinc-400">
+              Per page
+            </label>
+            <select
+              id="questions-page-size"
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className="border border-stone-300 dark:border-zinc-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 text-sm"
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+
+            <nav aria-label="Questions pagination" className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => goToPage(page - 1)}
+                disabled={!hasPreviousPage}
+                className="px-3 py-1.5 rounded-lg border border-stone-300 dark:border-zinc-600 text-sm text-stone-700 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-100 dark:hover:bg-zinc-800"
+              >
+                Previous
+              </button>
+
+              {visiblePages.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => goToPage(pageNumber)}
+                  aria-current={pageNumber === currentPage ? "page" : undefined}
+                  className={`min-w-[2.25rem] px-2 py-1.5 rounded-lg border text-sm ${
+                    pageNumber === currentPage
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-stone-300 dark:border-zinc-600 text-stone-700 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => goToPage(page + 1)}
+                disabled={!hasNextPage}
+                className="px-3 py-1.5 rounded-lg border border-stone-300 dark:border-zinc-600 text-sm text-stone-700 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-100 dark:hover:bg-zinc-800"
+              >
+                Next
+              </button>
+            </nav>
+          </div>
         </div>
       )}
 
