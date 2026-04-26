@@ -205,6 +205,7 @@ Shop owners get their webhook URL and embeddable widget HTML from the **Credenti
 
 - **[API_DOCS.md](./API_DOCS.md)** — Complete API reference with request/response examples
 - **[WEBHOOK_DOCS.md](./WEBHOOK_DOCS.md)** — Storefront integration guide for plugin developers
+- **[backend/MCP_SERVER.md](./backend/MCP_SERVER.md)** — MCP server for AI-driven question answering operations
 
 ## CI/CD and Deployment
 
