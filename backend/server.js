@@ -14,6 +14,7 @@ const answerRoutes = require("./routes/answers");
 const voteRoutes = require("./routes/votes");
 const contributorRoutes = require("./routes/contributors");
 const emailRoutes = require("./routes/email");
+const mcpRoutes = require("./routes/mcp");
 const { resolveCorsOptions } = require("./services/corsService");
 const { createRateLimiter } = require("./middleware/rateLimit");
 const errorHandler = require("./middleware/errorHandler");
@@ -54,6 +55,12 @@ const webhookWriteRateLimiter = createRateLimiter({
   message: "Webhook rate limit exceeded. Please slow down.",
 });
 
+const mcpOperationsRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 180,
+  message: "MCP operation rate limit exceeded. Please slow down.",
+});
+
 // Health check (both paths for flexibility)
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.get("/api/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
@@ -73,6 +80,7 @@ app.use("/api/answers", answerRoutes);
 app.use("/api/votes", voteRoutes);
 app.use("/api/contributors", contributorRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/mcp", mcpOperationsRateLimiter, mcpRoutes);
 
 // Error handler
 app.use(errorHandler);

@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -115,108 +113,107 @@ function textResult(data) {
   };
 }
 
-const apiClient = new BackendApiClient();
-const server = new McpServer({
-  name: "faq-backend-operations",
-  version: "1.0.0",
-});
+export function createFaqMcpServer({ name = "faq-backend-operations", version = "1.0.0" } = {}) {
+  const apiClient = new BackendApiClient();
 
-server.registerTool(
-  "list_questions_for_answering",
-  {
-    title: "List Questions for Answering",
-    description:
-      "Fetch questions from the backend MCP operations API and filter by answer state.",
-    inputSchema: {
-      answerState: z.enum(["unanswered", "answered", "all"]).default("unanswered"),
-      page: z.number().int().min(1).default(1),
-      limit: z.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
-      scanPages: z.number().int().min(1).max(10).default(1),
-      status: z.string().optional(),
-      search: z.string().optional(),
-      sortBy: z.enum(["newest", "oldest", "popular"]).default("newest"),
-    },
-  },
-  async ({ answerState, page, limit, scanPages, status, search, sortBy }) => {
-    const response = await apiClient.request("/questions", {
-      query: {
-        answerState,
-        page,
-        limit,
-        scanPages,
-        status,
-        search,
-        sortBy,
+  const server = new McpServer({ name, version });
+
+  server.registerTool(
+    "list_questions_for_answering",
+    {
+      title: "List Questions for Answering",
+      description:
+        "Fetch questions from the backend MCP operations API and filter by answer state.",
+      inputSchema: {
+        answerState: z.enum(["unanswered", "answered", "all"]).default("unanswered"),
+        page: z.number().int().min(1).default(1),
+        limit: z.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
+        scanPages: z.number().int().min(1).max(10).default(1),
+        status: z.string().optional(),
+        search: z.string().optional(),
+        sortBy: z.enum(["newest", "oldest", "popular"]).default("newest"),
       },
-    });
-
-    return textResult(response);
-  }
-);
-
-server.registerTool(
-  "get_question_details",
-  {
-    title: "Get Question Details",
-    description:
-      "Fetch one question with full context and existing answers from MCP operations API.",
-    inputSchema: {
-      questionId: z.string().min(1),
     },
-  },
-  async ({ questionId }) => {
-    const response = await apiClient.request(`/questions/${questionId}`);
-    return textResult(response);
-  }
-);
+    async ({ answerState, page, limit, scanPages, status, search, sortBy }) => {
+      const response = await apiClient.request("/questions", {
+        query: {
+          answerState,
+          page,
+          limit,
+          scanPages,
+          status,
+          search,
+          sortBy,
+        },
+      });
 
-server.registerTool(
-  "post_answer",
-  {
-    title: "Post Answer",
-    description: "Create an answer via MCP operations API.",
-    inputSchema: {
-      questionId: z.string().min(1),
-      answerText: z.string().min(3).max(20000),
-      status: z.enum(["pending", "published", "rejected", "suspended"]).default("pending"),
+      return textResult(response);
+    }
+  );
+
+  server.registerTool(
+    "get_question_details",
+    {
+      title: "Get Question Details",
+      description:
+        "Fetch one question with full context and existing answers from MCP operations API.",
+      inputSchema: {
+        questionId: z.string().min(1),
+      },
     },
-  },
-  async ({ questionId, answerText, status }) => {
-    const response = await apiClient.request("/answers", {
-      method: "POST",
-      body: { questionId, answerText, status },
-    });
+    async ({ questionId }) => {
+      const response = await apiClient.request(`/questions/${questionId}`);
+      return textResult(response);
+    }
+  );
 
-    return textResult({
-      created: true,
-      answer: response?.answer ?? null,
-    });
-  }
-);
+  server.registerTool(
+    "post_answer",
+    {
+      title: "Post Answer",
+      description: "Create an answer via MCP operations API.",
+      inputSchema: {
+        questionId: z.string().min(1),
+        answerText: z.string().min(3).max(20000),
+        status: z.enum(["pending", "published", "rejected", "suspended"]).default("pending"),
+      },
+    },
+    async ({ questionId, answerText, status }) => {
+      const response = await apiClient.request("/answers", {
+        method: "POST",
+        body: { questionId, answerText, status },
+      });
 
-server.registerTool(
-  "backend_health_check",
-  {
-    title: "Backend Health Check",
-    description: "Check backend API health.",
-  },
-  async () => {
-    const health = await apiClient.request("/health", { requiresAuth: false });
-    return textResult({
-      apiBaseUrl: apiClient.apiBaseUrl,
-      health,
-    });
-  }
-);
+      return textResult({
+        created: true,
+        answer: response?.answer ?? null,
+      });
+    }
+  );
 
-async function start() {
+  server.registerTool(
+    "backend_health_check",
+    {
+      title: "Backend Health Check",
+      description: "Check backend API health.",
+    },
+    async () => {
+      const health = await apiClient.request("/health", { requiresAuth: false });
+      return textResult({
+        apiBaseUrl: apiClient.apiBaseUrl,
+        health,
+      });
+    }
+  );
+
+  return { server, apiClient };
+}
+
+export async function startFaqMcpServer() {
+  const { server, apiClient } = createFaqMcpServer();
   apiClient.validateConfiguration();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(`FAQ Backend MCP server connected over stdio (API: ${apiClient.apiBaseUrl})`);
 }
-
-start().catch((error) => {
-  console.error("Failed to start FAQ Backend MCP server:", error);
-  process.exit(1);
-});

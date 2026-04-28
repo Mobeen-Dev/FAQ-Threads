@@ -1,0 +1,24 @@
+{
+  "name": "@faq-app/agent-operation",
+  "version": "1.0.0",
+  "description": "Public MCP server for FAQ backend answer operations",
+  "type": "module",
+  "main": "src/server.mjs",
+  "bin": {
+    "faq-app-agent-operation": "./src/cli.mjs"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "mcp",
+    "faq",
+    "agent",
+    "operations"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
+  }
+}

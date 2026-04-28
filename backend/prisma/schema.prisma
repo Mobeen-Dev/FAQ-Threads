@@ -233,6 +233,12 @@ model Setting {
 
   // Email preferences
   emailUnsubscribedTypes      String? // Comma-separated list of unsubscribed email types
+
+  // MCP access token (single active token per shop)
+  mcpTokenHash                String?  @unique
+  mcpTokenCreatedAt           DateTime?
+  mcpClientKeyHash            String?  @unique
+  mcpClientKeyCreatedAt       DateTime?
 }
 
 // ─── Email Logs (audit trail for sent emails) ───────────────
