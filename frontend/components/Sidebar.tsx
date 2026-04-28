@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import MaterialIcon from "@/components/MaterialIcon";
+import { isMcpIntegrationEnabled } from "@/config/featureFlags";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -13,6 +14,7 @@ const navItems = [
   { href: "/contributors", label: "Contributors", icon: "group" },
   { href: "/analytics", label: "Analytics", icon: "monitoring" },
   { href: "/credentials", label: "Shopify Store", icon: "storefront" },
+  ...(isMcpIntegrationEnabled() ? [{ href: "/mcp", label: "MCP", icon: "hub" }] : []),
   { href: "/settings", label: "Settings", icon: "settings" },
   { href: "/account", label: "Account", icon: "account_circle" },
 ];

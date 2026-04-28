@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useEffect } from "react";
 import Link from "next/link";
+import { isMcpIntegrationEnabled } from "@/config/featureFlags";
 
 const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/verify-email"];
 
@@ -16,6 +17,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+  const mobileNavItems = [
+    { href: "/dashboard", icon: "dashboard" },
+    { href: "/questions", icon: "help" },
+    { href: "/answers", icon: "chat" },
+    { href: "/contributors", icon: "group" },
+    { href: "/analytics", icon: "monitoring" },
+    { href: "/settings", icon: "settings" },
+    ...(isMcpIntegrationEnabled() ? [{ href: "/mcp", icon: "hub" }] : []),
+    { href: "/account", icon: "account_circle" },
+  ];
 
   const isPublicPage = publicPaths.includes(pathname);
 
@@ -48,15 +59,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
       <div className="flex-1 min-w-0">
         <div className="lg:hidden sticky top-0 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur border-b border-stone-200 dark:border-zinc-800">
           <div className="px-3 py-2 flex items-center gap-2 overflow-x-auto">
-            {[
-              { href: "/dashboard", icon: "dashboard" },
-              { href: "/questions", icon: "help" },
-              { href: "/answers", icon: "chat" },
-              { href: "/contributors", icon: "group" },
-              { href: "/analytics", icon: "monitoring" },
-              { href: "/settings", icon: "settings" },
-              { href: "/account", icon: "account_circle" },
-            ].map((item) => (
+            {mobileNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

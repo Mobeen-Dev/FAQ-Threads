@@ -174,6 +174,16 @@ cd frontend && npm run dev
 | GET    | `/api/settings`       | Get shop settings     |
 | PUT    | `/api/settings`       | Update settings       |
 
+### MCP Operations
+| Method | Endpoint                     | Description                                  |
+|--------|------------------------------|----------------------------------------------|
+| POST   | `/api/mcp/token/rotate`      | Rotate MCP token (JWT-protected admin route) |
+| GET    | `/api/mcp/token/status`      | MCP token status (JWT-protected admin route) |
+| DELETE | `/api/mcp/token`             | Revoke MCP token (JWT-protected admin route) |
+| GET    | `/api/mcp/c/:clientKey/questions`     | List MCP questions (MCP token + client key protected)     |
+| GET    | `/api/mcp/c/:clientKey/questions/:id` | Get MCP question details (MCP token + client key protected) |
+| POST   | `/api/mcp/c/:clientKey/answers`       | Post answer from MCP agent (MCP token + client key protected) |
+
 ### Votes (Public)
 | Method | Endpoint              | Description           |
 |--------|-----------------------|-----------------------|
@@ -206,6 +216,7 @@ Shop owners get their webhook URL and embeddable widget HTML from the **Credenti
 - **[API_DOCS.md](./API_DOCS.md)** — Complete API reference with request/response examples
 - **[WEBHOOK_DOCS.md](./WEBHOOK_DOCS.md)** — Storefront integration guide for plugin developers
 - **[backend/MCP_SERVER.md](./backend/MCP_SERVER.md)** — MCP server for AI-driven question answering operations
+- **[packages/agent-operation/README.md](./packages/agent-operation/README.md)** — Public npx MCP package usage
 
 ## CI/CD and Deployment
 
