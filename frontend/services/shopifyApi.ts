@@ -251,6 +251,21 @@ export interface ShopCredentials {
   widgetHtml: string;
 }
 
+export interface McpTokenStatus {
+  tokenConfigured: boolean;
+  tokenCreatedAt: string | null;
+  clientKeyConfigured: boolean;
+  clientKeyCreatedAt: string | null;
+}
+
+export interface McpRotateResponse {
+  token: string;
+  clientKey: string;
+  createdAt: string;
+  mcpApiBaseUrl: string;
+  warning?: string;
+}
+
 export interface EmailStatus {
   service: {
     provider: string;
@@ -429,6 +444,17 @@ export const shopifyApi = {
 
   deleteCredentials() {
     return request<void>("/credentials", { method: "DELETE" });
+  },
+
+  // MCP
+  getMcpTokenStatus() {
+    return request<McpTokenStatus>(`/mcp/token/status?nonce=${Date.now()}`);
+  },
+
+  rotateMcpToken() {
+    return request<McpRotateResponse>("/mcp/token/rotate", {
+      method: "POST",
+    });
   },
 
   // Email & Account
