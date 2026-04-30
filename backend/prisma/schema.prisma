@@ -127,6 +127,7 @@ model Answer {
   answerText    String    @db.Text
   status        String    @default("pending") // pending, published, rejected, suspended
   voteScore     Int       @default(0)
+  idempotencyKey String?
   contributorId String?
   contributor   StoreContributor? @relation(fields: [contributorId], references: [id], onDelete: SetNull)
   questionId    String
@@ -141,6 +142,7 @@ model Answer {
 
   @@index([questionId, status])
   @@index([shopId])
+  @@unique([shopId, idempotencyKey])
 }
 
 // ─── Votes (on questions or answers) ────────────────────────
