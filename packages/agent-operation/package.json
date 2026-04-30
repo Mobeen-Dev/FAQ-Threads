@@ -4,11 +4,21 @@
   "description": "Public MCP server for FAQ backend answer operations",
   "type": "module",
   "main": "src/server.mjs",
+  "scripts": {
+    "lint": "node --check src/cli.mjs && node --check src/server.mjs && node --check scripts/publish-guard.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:smoke": "node --test tests/smoke.test.mjs",
+    "publish:guard": "node scripts/publish-guard.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "faq-app-agent-operation": "./src/cli.mjs"
   },
   "files": [
-    "src"
+    "src",
+    "scripts"
   ],
   "keywords": [
     "mcp",

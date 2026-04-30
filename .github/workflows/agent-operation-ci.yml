@@ -1,0 +1,73 @@
+name: Agent Operation CI
+
+on:
+  pull_request:
+    paths:
+      - "packages/agent-operation/**"
+      - ".github/workflows/agent-operation-ci.yml"
+  push:
+    branches:
+      - main
+    tags:
+      - "agent-operation-v*"
+    paths:
+      - "packages/agent-operation/**"
+      - ".github/workflows/agent-operation-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  package-ci:
+    name: Lint, Test, Smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/agent-operation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/agent-operation/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Smoke test
+        run: npm run test:smoke
+
+  publish-guard:
+    name: Publish Guard
+    needs: package-ci
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/agent-operation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/agent-operation/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run publish guard
+        env:
+          FAQ_AGENT_PUBLISH_GUARD: "1"
+        run: npm run publish:guard
