@@ -7,7 +7,9 @@ const MAX_QUESTION_LENGTH = 5000;
 const MAX_ANSWER_LENGTH = 20000;
 const MAX_NAME_LENGTH = 200;
 const MAX_EMAIL_LENGTH = 254;
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const VALID_STATUSES = ["pending", "draft", "published", "rejected", "suspended"];
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9:_-]{8,128}$/;
 
 function validateString(value, maxLen, fieldName) {
   if (value && typeof value !== "string") {
@@ -309,24 +311,53 @@ async function createAnswer(shopId, questionId, data) {
   const validated = sanitizeInput(data, {
     answerText: { type: "string", maxLen: MAX_ANSWER_LENGTH, required: true },
     status: { type: "status" },
+    idempotencyKey: { type: "string", maxLen: MAX_IDEMPOTENCY_KEY_LENGTH },
   });
+  const idempotencyKey = validated.idempotencyKey || null;
+  if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+    throw Object.assign(
+      new Error("idempotencyKey must be 8-128 chars and only contain letters, numbers, ':', '_' or '-'"),
+      { status: 400 }
+    );
+  }
 
   const publishedAt = (validated.status === "published") ? new Date() : null;
+  const answerInclude = {
+    contributor: { select: { id: true, name: true, email: true, trusted: true } },
+  };
 
-  return prisma.answer.create({
-    data: {
-      answerText: validated.answerText,
-      status: validated.status || "pending",
-      source: data.source || "dashboard",
-      contributorId: data.contributorId || null,
-      questionId,
-      shopId,
-      publishedAt,
-    },
-    include: {
-      contributor: { select: { id: true, name: true, email: true, trusted: true } },
-    },
-  });
+  try {
+    const createdAnswer = await prisma.answer.create({
+      data: {
+        answerText: validated.answerText,
+        status: validated.status || "pending",
+        source: data.source || "dashboard",
+        contributorId: data.contributorId || null,
+        questionId,
+        shopId,
+        publishedAt,
+        idempotencyKey,
+      },
+      include: answerInclude,
+    });
+
+    return { ...createdAnswer, idempotencyReplayed: false };
+  } catch (error) {
+    const conflictTargets = Array.isArray(error?.meta?.target) ? error.meta.target : [];
+    const isIdempotencyConflict =
+      error?.code === "P2002" && idempotencyKey && conflictTargets.includes("shopId") && conflictTargets.includes("idempotencyKey");
+    if (!isIdempotencyConflict) throw error;
+
+    const existingAnswer = await prisma.answer.findFirst({
+      where: { shopId, idempotencyKey },
+      include: answerInclude,
+    });
+
+    if (existingAnswer) {
+      return { ...existingAnswer, idempotencyReplayed: true };
+    }
+    throw error;
+  }
 }
 
 async function updateAnswer(shopId, answerId, data) {

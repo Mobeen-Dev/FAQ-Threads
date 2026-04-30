@@ -1,5 +1,13 @@
 const mcpTokenService = require("../services/mcpTokenService");
 
+function unauthorized(res, errorCode, error) {
+  return res.status(401).json({
+    error,
+    errorCode,
+    retryable: false,
+  });
+}
+
 function extractToken(req) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -19,12 +27,12 @@ async function mcpTokenAuth(req, res, next) {
   try {
     const clientKey = req.params.clientKey;
     if (!clientKey || typeof clientKey !== "string") {
-      return res.status(401).json({ error: "Missing MCP client key in URL path." });
+      return unauthorized(res, "MCP_CLIENT_KEY_MISSING", "Missing MCP client key in URL path.");
     }
 
     const token = extractToken(req);
     if (!token) {
-      return res.status(401).json({ error: "Missing MCP token. Use Bearer token or x-mcp-token header." });
+      return unauthorized(res, "MCP_TOKEN_MISSING", "Missing MCP token. Use Bearer token or x-mcp-token header.");
     }
 
     const [tokenContext, keyContext] = await Promise.all([
@@ -33,15 +41,23 @@ async function mcpTokenAuth(req, res, next) {
     ]);
 
     if (!keyContext) {
-      return res.status(401).json({ error: "Invalid MCP client key. Rotate a new token/key from /api/mcp/token/rotate." });
+      return unauthorized(
+        res,
+        "MCP_CLIENT_KEY_INVALID",
+        "Invalid MCP client key. Rotate a new token/key from /api/mcp/token/rotate."
+      );
     }
 
     if (!tokenContext) {
-      return res.status(401).json({ error: "Invalid MCP token. Rotate a new token from /api/mcp/token/rotate." });
+      return unauthorized(res, "MCP_TOKEN_INVALID", "Invalid MCP token. Rotate a new token from /api/mcp/token/rotate.");
     }
 
     if (tokenContext.shopId !== keyContext.shopId) {
-      return res.status(401).json({ error: "MCP token/client key mismatch. Rotate fresh credentials from /api/mcp/token/rotate." });
+      return unauthorized(
+        res,
+        "MCP_CREDENTIAL_MISMATCH",
+        "MCP token/client key mismatch. Rotate fresh credentials from /api/mcp/token/rotate."
+      );
     }
 
     req.shopId = tokenContext.shopId;
